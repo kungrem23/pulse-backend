@@ -6,13 +6,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestLiveness(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	router := NewRouter(logger, (*pgxpool.Pool)(nil))
+	router := NewRouter(Dependencies{Logger: logger})
 	req := httptest.NewRequest(http.MethodGet, "/health/live", nil)
 	res := httptest.NewRecorder()
 

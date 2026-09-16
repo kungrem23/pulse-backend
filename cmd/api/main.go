@@ -32,8 +32,11 @@ func main() {
 	defer db.Close()
 
 	server := &http.Server{
-		Addr:              cfg.HTTPAddr,
-		Handler:           httpapi.NewRouter(logger, db),
+		Addr: cfg.HTTPAddr,
+		Handler: httpapi.NewRouter(httpapi.Dependencies{
+			Logger:   logger,
+			Database: db,
+		}),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		ReadTimeout:       cfg.ReadTimeout,
 		WriteTimeout:      cfg.WriteTimeout,

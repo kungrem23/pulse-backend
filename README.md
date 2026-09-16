@@ -30,14 +30,29 @@ Go сам по себе не читает `.env`: загрузите перем�
 ## Структура
 
 ```text
-cmd/api/                    точка входа и graceful shutdown
-internal/config/            конфигурация из environment
-internal/domain/            сущности и порты бизнес-логики
-internal/platform/database/ подключение к PostgreSQL
-internal/transport/http/    маршруты, middleware, JSON-ответы
-migrations/                 SQL-схема и rollback
-deploy/                     мониторинг
+cmd/api/                       точка сборки приложения и graceful shutdown
+internal/app/                  сценарии приложения и их контракты
+  auth/                        регистрация и вход
+  profile/                     анкета и предпочтения
+  media/                       фотографии
+  discovery/                   лента рекомендаций
+  matching/                    свайпы и мэтчи
+  chat/                        сообщения
+  moderation/                  жалобы и действия администратора
+internal/domain/               сущности и порты хранения
+internal/repository/postgres/  реализации репозиториев PostgreSQL
+internal/storage/s3/           реализация хранилища фотографий
+internal/platform/database/    создание пула подключений
+internal/transport/http/       HTTP-адаптеры по тем же сценариям
+  httpx/                       общие JSON-ответы и ошибки
+  middleware/                  logging, recovery и metrics
+migrations/                    SQL-схема и rollback
+deploy/                        мониторинг
 ```
+
+Папки в `transport/http` знают о JSON, URL и HTTP-кодах. Одноимённые папки
+в `app` описывают бизнес-сценарии и не зависят от HTTP. `router.go` только
+соединяет обработчики, маршруты и middleware.
 
 ## API-контуры
 
