@@ -8,7 +8,7 @@ type AdminRepository interface {
 }
 
 type UserRepository interface {
-	Create(context.Context, User) error
+	Create(context.Context, User) (User, error)
 	ByEmail(context.Context, string) (User, error)
 	ByID(context.Context, string) (User, error)
 }
