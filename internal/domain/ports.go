@@ -3,6 +3,10 @@ package domain
 import "context"
 
 // Интерфейсы принадлежат бизнес-слою; PostgreSQL и S3 реализуют их снаружи.
+type AdminRepository interface {
+	ByUsername(context.Context, string) (Admin, error)
+}
+
 type UserRepository interface {
 	Create(context.Context, User) error
 	ByEmail(context.Context, string) (User, error)

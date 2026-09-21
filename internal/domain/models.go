@@ -10,6 +10,12 @@ const (
 	SexOther  Sex = "other"
 )
 
+type Admin struct {
+	ID           string `json:"id"`
+	Username     string `json:"username"`
+	PasswordHash string `json:"-"`
+}
+
 type User struct {
 	ID           string    `json:"id"`
 	Email        string    `json:"email"`
