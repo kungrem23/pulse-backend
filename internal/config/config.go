@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+const defaultJWTSecret = "change-me-in-production-at-least-32-bytes"
+
 type Config struct {
 	Environment       string
 	HTTPAddr          string
@@ -23,7 +25,7 @@ func Load() (Config, error) {
 		Environment:       env("APP_ENV", "local"),
 		HTTPAddr:          env("HTTP_ADDR", ":8080"),
 		DatabaseURL:       env("DATABASE_URL", "postgres://pulse:pulse@localhost:5432/pulse?sslmode=disable"),
-		JWTSecret:         env("JWT_SECRET", "change-me-in-production"),
+		JWTSecret:         env("JWT_SECRET", defaultJWTSecret),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -34,7 +36,7 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("parse SHUTDOWN_TIMEOUT: %w", err)
 	}
-	if cfg.Environment == "production" && cfg.JWTSecret == "change-me-in-production" {
+	if cfg.Environment == "production" && cfg.JWTSecret == defaultJWTSecret {
 		return Config{}, fmt.Errorf("JWT_SECRET must be configured in production")
 	}
 	return cfg, nil
