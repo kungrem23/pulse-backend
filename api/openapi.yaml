@@ -1090,7 +1090,7 @@ components:
     Profile:
       type: object
       additionalProperties: false
-      required: [user_id, name, bio, birth_date, age, sex, city, is_sleeping]
+      required: [user_id, name, bio, age, sex, city, is_sleeping]
       properties:
         user_id:
           type: string
@@ -1099,12 +1099,10 @@ components:
           type: string
         bio:
           type: string
-        birth_date:
-          type: string
-          format: date
         age:
           type: integer
           minimum: 18
+          maximum: 120
         sex:
           $ref: "#/components/schemas/Sex"
         city:

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/example/pulse-backend/internal/app/adminauth"
 	appauth "github.com/example/pulse-backend/internal/app/auth"
 	appchat "github.com/example/pulse-backend/internal/app/chat"
 	appdiscovery "github.com/example/pulse-backend/internal/app/discovery"
@@ -28,6 +29,7 @@ type Dependencies struct {
 	Logger     *slog.Logger
 	Database   health.Pinger
 	Auth       appauth.Service
+	AdminAuth  adminauth.Service
 	Profile    appprofile.Service
 	Media      appmedia.Service
 	Discovery  appdiscovery.Service
@@ -43,7 +45,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	health.RegisterRoutes(mux, health.NewHandler(deps.Database))
 	mux.Handle("GET /metrics", metrics)
 
-	httpauth.RegisterRoutes(mux, httpauth.NewHandler(deps.Auth))
+	httpauth.RegisterRoutes(mux, httpauth.NewHandler(deps.Auth, deps.AdminAuth))
 	httpprofile.RegisterRoutes(mux, httpprofile.NewHandler(deps.Profile))
 	httpmedia.RegisterRoutes(mux, httpmedia.NewHandler(deps.Media))
 	httpdiscovery.RegisterRoutes(mux, httpdiscovery.NewHandler(deps.Discovery))
