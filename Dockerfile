@@ -1,3 +1,4 @@
+# Образ для сборки
 FROM golang:1.27-alpine AS builder
 
 WORKDIR /usr/src/app
@@ -8,8 +9,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o backend ./cmd/api/main.go
 
-#-------------------------
-
+# Образ для запуска приложения
 FROM debian:12-slim
 
 WORKDIR /app
