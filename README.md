@@ -1,33 +1,4 @@
-# Pulse backend
-
-Запускаемый скелет backend для приложения знакомств. Стек: Go (`net/http`),
-PostgreSQL, S3-compatible object storage (MinIO локально), Docker Compose,
-Prometheus и Grafana.
-
-## Быстрый старт
-
-```bash
-docker compose up --build
-curl http://localhost:8080/health/live
-curl http://localhost:8080/health/ready
-```
-
-При первом старте PostgreSQL применит `migrations/000001_init.up.sql`. Чтобы
-пересоздать локальную БД с нуля: `docker compose down -v && docker compose up --build`.
-
-Без Docker:
-
-```bash
-cp .env.example .env
-export DATABASE_URL='postgres://pulse:pulse@localhost:5432/pulse?sslmode=disable'
-make migrate-up
-make run
-```
-
-Go сам по себе не читает `.env`: загрузите переменные оболочкой или добавьте
-локальный dotenv-инструмент.
-
-## Структура
+# Структура
 
 ```text
 cmd/api/                       точка сборки приложения и graceful shutdown
