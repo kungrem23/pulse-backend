@@ -16,6 +16,9 @@ type Config struct {
 	HTTPAddr          string
 	DatabaseURL       string
 	JWTSecret         string
+	JWTIssuer         string
+	AccessTokenTTL    time.Duration
+	RefreshTokenTTL   time.Duration
 	ShutdownTimeout   time.Duration
 	ReadHeaderTimeout time.Duration
 	ReadTimeout       time.Duration
@@ -28,6 +31,7 @@ func Load() (Config, error) {
 		Environment:       env("APP_ENV", "local"),
 		HTTPAddr:          env("HTTP_ADDR", ":8080"),
 		JWTSecret:         env("JWT_SECRET", defaultJWTSecret),
+		JWTIssuer:         env("JWT_ISSUER", "pulse"),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -41,6 +45,14 @@ func Load() (Config, error) {
 	cfg.ShutdownTimeout, err = time.ParseDuration(env("SHUTDOWN_TIMEOUT", "10s"))
 	if err != nil {
 		return Config{}, fmt.Errorf("parse SHUTDOWN_TIMEOUT: %w", err)
+	}
+	cfg.AccessTokenTTL, err = time.ParseDuration(env("JWT_ACCESS_TTL", "15m"))
+	if err != nil {
+		return Config{}, fmt.Errorf("parse JWT_ACCESS_TTL: %w", err)
+	}
+	cfg.RefreshTokenTTL, err = time.ParseDuration(env("JWT_REFRESH_TTL", "720h"))
+	if err != nil {
+		return Config{}, fmt.Errorf("parse JWT_REFRESH_TTL: %w", err)
 	}
 	if cfg.Environment == "production" && cfg.JWTSecret == defaultJWTSecret {
 		return Config{}, fmt.Errorf("JWT_SECRET must be configured in production")

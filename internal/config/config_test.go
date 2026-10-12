@@ -42,3 +42,14 @@ func TestLoadRejectsInvalidDatabasePort(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadRejectsInvalidTokenTTL(t *testing.T) {
+	for _, key := range []string{"JWT_ACCESS_TTL", "JWT_REFRESH_TTL"} {
+		t.Run(key, func(t *testing.T) {
+			t.Setenv(key, "soon")
+			if _, err := Load(); err == nil {
+				t.Fatalf("expected invalid %s to be rejected", key)
+			}
+		})
+	}
+}

@@ -30,7 +30,25 @@ type sessionResponse struct {
 	RefreshExpiresAt time.Time `json:"refresh_expires_at"`
 }
 
+type userResponse struct {
+	ID        string    `json:"id"`
+	Email     string    `json:"email"`
+	Age       int       `json:"age"`
+	IsBlocked bool      `json:"is_blocked"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func newUserResponse(user domain.User) userResponse {
+	return userResponse{
+		ID:        user.ID,
+		Email:     user.Email,
+		Age:       user.Age,
+		IsBlocked: user.IsBlocked,
+		CreatedAt: user.CreatedAt.UTC(),
+	}
+}
+
 type registerResponse struct {
-	User    domain.User     `json:"user"`
+	User    userResponse    `json:"user"`
 	Session sessionResponse `json:"session"`
 }

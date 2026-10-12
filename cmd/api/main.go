@@ -9,8 +9,11 @@ import (
 	"os/signal"
 	"syscall"
 
+	appauth "github.com/kungrem23/pulse-backend/internal/app/auth"
 	"github.com/kungrem23/pulse-backend/internal/config"
 	"github.com/kungrem23/pulse-backend/internal/platform/database"
+	"github.com/kungrem23/pulse-backend/internal/repository/postgres"
+	"github.com/kungrem23/pulse-backend/internal/security"
 	httpapi "github.com/kungrem23/pulse-backend/internal/transport/http"
 )
 
@@ -20,6 +23,17 @@ func main() {
 		panic(err)
 	}
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	tokens, err := security.NewTokenIssuer(security.TokenIssuerConfig{
+		Secret:          cfg.JWTSecret,
+		Issuer:          cfg.JWTIssuer,
+		AccessTokenTTL:  cfg.AccessTokenTTL,
+		RefreshTokenTTL: cfg.RefreshTokenTTL,
+	})
+	if err != nil {
+		logger.Error("invalid JWT configuration", "error", err)
+		os.Exit(1)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -36,6 +50,11 @@ func main() {
 		Handler: httpapi.NewRouter(httpapi.Dependencies{
 			Logger:   logger,
 			Database: db,
+			Auth: appauth.NewService(
+				postgres.NewUserRepository(db),
+				security.NewDefaultPasswordManager(),
+				tokens,
+			),
 		}),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		ReadTimeout:       cfg.ReadTimeout,

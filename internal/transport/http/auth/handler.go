@@ -56,7 +56,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpx.WriteJSON(w, http.StatusCreated, registerResponse{
-		User:    registration.User,
+		User:    newUserResponse(registration.User),
 		Session: userSessionResponse(registration.Session),
 	})
 }
@@ -118,8 +118,10 @@ func (h *Handler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, adminSessionResponse(session))
 }
 
+const maxAuthRequestBytes = 16 << 10
+
 func decodeJSON(r *http.Request, destination any) error {
-	decoder := json.NewDecoder(r.Body)
+	decoder := json.NewDecoder(io.LimitReader(r.Body, maxAuthRequestBytes))
 	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(destination); err != nil {

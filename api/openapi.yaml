@@ -98,8 +98,6 @@ paths:
             schema:
               $ref: "#/components/schemas/RegisterRequest"
       responses:
-        "501":
-          $ref: "#/components/responses/NotImplemented"
         "201":
           description: User registered and session created
           content:
@@ -132,8 +130,6 @@ paths:
             schema:
               $ref: "#/components/schemas/LoginRequest"
       responses:
-        "501":
-          $ref: "#/components/responses/NotImplemented"
         "200":
           description: Authentication successful
           content:
