@@ -1,0 +1,48 @@
+name: pulse-backend-test
+
+# This override deliberately uses another Compose project, ports, credentials,
+# database name and named volumes. It must never be pointed at a developer or
+# production database.
+services:
+  backend:
+    ports: !override
+      - "18080:8080"
+    environment:
+      APP_ENV: test
+      DB_USER: pulse_test
+      DB_PASSWORD: pulse_test
+      DB_NAME: pulse_test
+      S3_BUCKET: pulse-test
+      S3_ACCESS_KEY: pulse-test
+      S3_SECRET_KEY: pulse-test-secret
+
+  db:
+    ports: !override
+      - "15432:5432"
+    environment:
+      POSTGRES_USER: pulse_test
+      POSTGRES_PASSWORD: pulse_test
+      POSTGRES_DB: pulse_test
+
+  db-schema:
+    environment:
+      PGUSER: pulse_test
+      PGPASSWORD: pulse_test
+      PGDATABASE: pulse_test
+
+  minio:
+    ports: !override
+      - "19000:9000"
+      - "19001:9001"
+    environment:
+      MINIO_ROOT_USER: pulse-test
+      MINIO_ROOT_PASSWORD: pulse-test-secret
+      S3_BUCKET: pulse-test
+
+  minio-init:
+    environment:
+      MC_MINIO_ROOT_USER: pulse-test
+      MC_MINIO_ROOT_PASSWORD: pulse-test-secret
+    command:
+      - ready minio
+      - mb --ignore-existing minio/pulse-test

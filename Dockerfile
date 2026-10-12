@@ -1,5 +1,6 @@
-# Образ для сборки
-FROM golang:1.27-alpine AS builder
+# Keep the toolchain pinned so the same sources are built with the same Go
+# release on every developer machine.
+FROM golang:1.23.12-alpine3.21@sha256:4bb4be21ac98da06bc26437ee870c4973f8039f13e9a1a36971b4517632b0fc6 AS builder
 
 WORKDIR /usr/src/app
 
@@ -7,16 +8,16 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o backend ./cmd/api/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/backend ./cmd/api
 
-# Образ для запуска приложения
-FROM debian:12-slim
+# The binary is static. Copy only the CA bundle needed by future HTTPS-backed
+# adapters and run without root or a shell in the final image.
+FROM scratch
 
-WORKDIR /app
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=builder /out/backend /backend
 
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+USER 65532:65532
+EXPOSE 8080
 
-COPY --from=builder /usr/src/app/backend .
-# COPY .env .
-
-CMD [ "./backend" ]
+ENTRYPOINT ["/backend"]
