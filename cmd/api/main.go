@@ -13,8 +13,10 @@ import (
 	appprofile "github.com/kungrem23/pulse-backend/internal/app/profile"
 	"github.com/kungrem23/pulse-backend/internal/config"
 	"github.com/kungrem23/pulse-backend/internal/platform/database"
+
 	"github.com/kungrem23/pulse-backend/internal/repository/postgres"
 	"github.com/kungrem23/pulse-backend/internal/security"
+	photostorage "github.com/kungrem23/pulse-backend/internal/storage/s3"
 	httpapi "github.com/kungrem23/pulse-backend/internal/transport/http"
 )
 
@@ -46,6 +48,20 @@ func main() {
 	}
 	defer db.Close()
 
+	photoStore, err := photostorage.New(photostorage.Config{
+		Endpoint:       cfg.PhotoStorage.Endpoint,
+		PublicEndpoint: cfg.PhotoStorage.PublicEndpoint,
+		Bucket:         cfg.PhotoStorage.Bucket,
+		AccessKey:      cfg.PhotoStorage.AccessKey,
+		SecretKey:      cfg.PhotoStorage.SecretKey,
+		Region:         cfg.PhotoStorage.Region,
+		PresignTTL:     cfg.PhotoStorage.PresignTTL,
+	})
+	if err != nil {
+		logger.Error("photo storage configuration failed", "error", err)
+		os.Exit(1)
+	}
+
 	server := &http.Server{
 		Addr: cfg.HTTPAddr,
 		Handler: httpapi.NewRouter(httpapi.Dependencies{
@@ -57,7 +73,8 @@ func main() {
 				security.NewDefaultPasswordManager(),
 				tokens,
 			),
-			Profile: appprofile.NewService(postgres.NewProfileRepository(db)),
+			PhotoStore: photoStore,
+			Profile:    appprofile.NewService(postgres.NewProfileRepository(db)),
 		}),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		ReadTimeout:       cfg.ReadTimeout,

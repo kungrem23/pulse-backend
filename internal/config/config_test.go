@@ -2,7 +2,9 @@ package config
 
 import (
 	"net/url"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestLoadBuildsDatabaseURLFromSeparateFields(t *testing.T) {
@@ -29,6 +31,53 @@ func TestLoadBuildsDatabaseURLFromSeparateFields(t *testing.T) {
 	}
 	if parsed.Host != "localhost:5432" || parsed.Path != "/pulse-test" || parsed.Query().Get("sslmode") != "require" {
 		t.Fatal("database connection fields were not preserved")
+	}
+}
+
+func TestLoadReadsPhotoStorageSettings(t *testing.T) {
+	t.Setenv("S3_ENDPOINT", "http://minio:9000")
+	t.Setenv("S3_PUBLIC_ENDPOINT", "https://media.example.test")
+	t.Setenv("S3_BUCKET", "pulse-media")
+	t.Setenv("S3_ACCESS_KEY", "access")
+	t.Setenv("S3_SECRET_KEY", "secret")
+	t.Setenv("S3_REGION", "eu-central-1")
+	t.Setenv("S3_PRESIGN_TTL", "20m")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.PhotoStorage.Endpoint != "http://minio:9000" ||
+		cfg.PhotoStorage.PublicEndpoint != "https://media.example.test" ||
+		cfg.PhotoStorage.Bucket != "pulse-media" ||
+		cfg.PhotoStorage.Region != "eu-central-1" ||
+		cfg.PhotoStorage.PresignTTL != 20*time.Minute {
+		t.Fatalf("unexpected photo storage config: %#v", cfg.PhotoStorage)
+	}
+}
+
+func TestLoadRejectsInvalidPhotoStorageSettingsWithoutLeakingSecret(t *testing.T) {
+	secret := "must-not-appear-in-errors"
+	t.Setenv("S3_SECRET_KEY", secret)
+	t.Setenv("S3_PUBLIC_ENDPOINT", "https://user:password@example.test/path")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected invalid S3_PUBLIC_ENDPOINT to be rejected")
+	}
+	if strings.Contains(err.Error(), secret) || strings.Contains(err.Error(), "password") {
+		t.Fatalf("configuration error leaked credentials: %v", err)
+	}
+}
+
+func TestLoadRejectsInvalidPresignTTL(t *testing.T) {
+	for _, value := range []string{"not-a-duration", "0s", "169h"} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv("S3_PRESIGN_TTL", value)
+			if _, err := Load(); err == nil {
+				t.Fatal("expected invalid S3_PRESIGN_TTL to be rejected")
+			}
+		})
 	}
 }
 

@@ -28,6 +28,7 @@ import (
 type Dependencies struct {
 	Logger     *slog.Logger
 	Database   health.Pinger
+	PhotoStore health.Pinger
 	Auth       appauth.Service
 	AdminAuth  adminauth.Service
 	Profile    appprofile.Service
@@ -48,7 +49,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	}
 	requireUser := middleware.RequireUser(authenticator)
 
-	health.RegisterRoutes(mux, health.NewHandler(deps.Database))
+	health.RegisterRoutes(mux, health.NewHandler(deps.Database, deps.PhotoStore))
 	mux.Handle("GET /metrics", metrics)
 
 	httpauth.RegisterRoutes(mux, httpauth.NewHandler(deps.Auth, deps.AdminAuth), requireUser)

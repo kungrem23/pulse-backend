@@ -41,7 +41,7 @@ internal/app/                  сценарии приложения и инте
   moderation/                  будущие жалобы и действия администратора
 internal/domain/               сущности, ограничения и порты хранения
 internal/repository/postgres/  место будущих реализаций репозиториев
-internal/storage/s3/           место будущего S3-адаптера
+internal/storage/s3/           S3-адаптер фотографий и интеграционный тест
 internal/platform/database/    создание пула подключений PostgreSQL
 internal/security/             bcrypt и JWT
 internal/transport/http/       HTTP-адаптеры, DTO, маршруты и middleware
@@ -79,6 +79,12 @@ AI/                            контекст и инструкции для �
 переменной. В Compose host базы — `db`, endpoint хранилища —
 `http://minio:9000`; при запуске Go на хосте используйте `localhost`.
 Примерные credentials предназначены только для local/test.
+
+Для хранилища используются `S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT`, `S3_BUCKET`,
+`S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION` и `S3_PRESIGN_TTL`.
+`S3_ENDPOINT` доступен самому backend, а `S3_PUBLIC_ENDPOINT` должен быть
+доступен frontend: адаптер подписывает URL для него. Readiness проверяет и
+PostgreSQL, и наличие настроенного bucket.
 
 ```bash
 docker compose up --build --detach
@@ -123,6 +129,7 @@ git diff --check
 
 `verify-environment.sh` использует только изолированный Compose-проект
 `pulse-backend-t01-test`, проверяет build/runtime, health, SQL-инварианты,
-сохранность PostgreSQL/MinIO после restart и legacy guard, затем удаляет
-этот тестовый проект с volumes. Проходящие проверки T01 не означают
-готовность бизнес-сценариев MVP.
+реальные put/get/delete через S3-адаптер, безопасную реакцию readiness на
+отказ MinIO, сохранность PostgreSQL/MinIO после restart и legacy guard, затем
+удаляет этот тестовый проект с volumes. Проходящие проверки T01/T07 не означают
+готовность HTTP-управления фотографиями: оно относится к T08.

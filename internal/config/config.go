@@ -19,6 +19,7 @@ type Config struct {
 	JWTIssuer         string
 	AccessTokenTTL    time.Duration
 	RefreshTokenTTL   time.Duration
+	PhotoStorage      PhotoStorageConfig
 	ShutdownTimeout   time.Duration
 	ReadHeaderTimeout time.Duration
 	ReadTimeout       time.Duration
@@ -26,12 +27,31 @@ type Config struct {
 	IdleTimeout       time.Duration
 }
 
+type PhotoStorageConfig struct {
+	Endpoint       string
+	PublicEndpoint string
+	Bucket         string
+	AccessKey      string
+	SecretKey      string
+	Region         string
+	PresignTTL     time.Duration
+}
+
 func Load() (Config, error) {
+	storageEndpoint := env("S3_ENDPOINT", "http://localhost:9000")
 	cfg := Config{
-		Environment:       env("APP_ENV", "local"),
-		HTTPAddr:          env("HTTP_ADDR", ":8080"),
-		JWTSecret:         env("JWT_SECRET", defaultJWTSecret),
-		JWTIssuer:         env("JWT_ISSUER", "pulse"),
+		Environment: env("APP_ENV", "local"),
+		HTTPAddr:    env("HTTP_ADDR", ":8080"),
+		JWTSecret:   env("JWT_SECRET", defaultJWTSecret),
+		JWTIssuer:   env("JWT_ISSUER", "pulse"),
+		PhotoStorage: PhotoStorageConfig{
+			Endpoint:       storageEndpoint,
+			PublicEndpoint: env("S3_PUBLIC_ENDPOINT", storageEndpoint),
+			Bucket:         env("S3_BUCKET", "pulse"),
+			AccessKey:      env("S3_ACCESS_KEY", "pulse"),
+			SecretKey:      env("S3_SECRET_KEY", "pulse-minio-secret"),
+			Region:         env("S3_REGION", "us-east-1"),
+		},
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -54,10 +74,41 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("parse JWT_REFRESH_TTL: %w", err)
 	}
+	cfg.PhotoStorage.PresignTTL, err = time.ParseDuration(env("S3_PRESIGN_TTL", "15m"))
+	if err != nil || cfg.PhotoStorage.PresignTTL <= 0 || cfg.PhotoStorage.PresignTTL > 7*24*time.Hour {
+		return Config{}, fmt.Errorf("S3_PRESIGN_TTL must be a duration between 1ns and 168h")
+	}
+	if err := validatePhotoStorage(cfg.PhotoStorage); err != nil {
+		return Config{}, err
+	}
 	if cfg.Environment == "production" && cfg.JWTSecret == defaultJWTSecret {
 		return Config{}, fmt.Errorf("JWT_SECRET must be configured in production")
 	}
 	return cfg, nil
+}
+
+func validatePhotoStorage(cfg PhotoStorageConfig) error {
+	for name, value := range map[string]string{
+		"S3_BUCKET":     cfg.Bucket,
+		"S3_ACCESS_KEY": cfg.AccessKey,
+		"S3_SECRET_KEY": cfg.SecretKey,
+		"S3_REGION":     cfg.Region,
+	} {
+		if value == "" {
+			return fmt.Errorf("%s must not be empty", name)
+		}
+	}
+	for name, value := range map[string]string{
+		"S3_ENDPOINT":        cfg.Endpoint,
+		"S3_PUBLIC_ENDPOINT": cfg.PublicEndpoint,
+	} {
+		parsed, err := url.Parse(value)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" ||
+			parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+			return fmt.Errorf("%s must be an HTTP(S) origin without credentials, path, query or fragment", name)
+		}
+	}
+	return nil
 }
 
 // Database credentials are configured as separate fields. url.URL safely

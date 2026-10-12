@@ -3,20 +3,23 @@ package health
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/kungrem23/pulse-backend/internal/transport/http/httpx"
 )
+
+const readinessTimeout = 3 * time.Second
 
 type Pinger interface {
 	Ping(context.Context) error
 }
 
 type Handler struct {
-	database Pinger
+	checks []Pinger
 }
 
-func NewHandler(database Pinger) *Handler {
-	return &Handler{database: database}
+func NewHandler(checks ...Pinger) *Handler {
+	return &Handler{checks: checks}
 }
 
 func (h *Handler) Live(w http.ResponseWriter, _ *http.Request) {
@@ -24,9 +27,13 @@ func (h *Handler) Live(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
-	if h.database == nil || h.database.Ping(r.Context()) != nil {
-		httpx.Error(w, http.StatusServiceUnavailable, "database is unavailable")
-		return
+	ctx, cancel := context.WithTimeout(r.Context(), readinessTimeout)
+	defer cancel()
+	for _, check := range h.checks {
+		if check == nil || check.Ping(ctx) != nil {
+			httpx.Error(w, http.StatusServiceUnavailable, "dependency is unavailable")
+			return
+		}
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ready"})
 }
