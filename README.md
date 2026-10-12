@@ -68,39 +68,47 @@ AI/                            контекст и инструкции для �
 
 ## Локальная конфигурация
 
-Для нового окружения скопируйте `.env.example` в `.env`, затем задайте свои значения.
-Существующий `.env` не перезаписывайте. Go-приложение читает переменные окружения;
-самостоятельно `.env` оно не загружает. Docker Compose загружает этот файл.
+Для запуска нужны Docker Engine и Docker Compose v2. Значений по
+умолчанию достаточно для local-стенда. Для своих настроек скопируйте
+`.env.example` в `.env`; существующий `.env` не перезаписывайте. Compose
+читает этот файл для подстановки; Go-приложение на хосте само `.env` не
+загружает.
 
 Подключение к базе задаётся отдельными `DB_HOST`, `DB_PORT`, `DB_USER`,
-`DB_PASSWORD`, `DB_NAME`, `DB_SSLMODE`. Приложение безопасно собирает строку
-подключения внутри конфигурации; `DATABASE_URL` больше не является входной
-переменной. В Compose host всегда `db`, для запуска на хосте — `localhost`.
-Локальные значения по умолчанию — пользователь, пароль и база `pulse`.
+`DB_PASSWORD`, `DB_NAME`, `DB_SSLMODE`. `DATABASE_URL` не является входной
+переменной. В Compose host базы — `db`, endpoint хранилища —
+`http://minio:9000`; при запуске Go на хосте используйте `localhost`.
+Примерные credentials предназначены только для local/test.
 
 ```bash
-docker compose up --build
+docker compose up --build --detach
+curl --fail http://localhost:8080/health/live
+curl --fail http://localhost:8080/health/ready
 ```
 
-Сервер слушает `:8080`. Миграции автоматически не применяются.
+Доступны API `http://localhost:8080`, PostgreSQL `localhost:5432`, S3 API
+`http://localhost:9000` и MinIO Console `http://localhost:9001`. `db-schema` и
+`minio-init` должны завершиться с кодом 0. Остановка без удаления
+данных: `docker compose down`.
 
 ## Миграции
 
-`initial_001.sql` — сохранённая историческая схема; она не является текущей
-моделью. `decisions_002.sql` заменяет только пустые таблицы согласованной
-MVP-схемой с UUID. Если есть хотя бы одна старая запись, миграция завершается
-ошибкой без изменения данных: потребуется отдельная миграция данных.
+`initial_001.sql` — сохранённая историческая схема. `decisions_002.sql`
+заменяет только её пустые таблицы согласованной MVP-схемой. На новом
+Compose volume оба файла применяются как `initial_001 → decisions_002`;
+`db-schema` проверяет результат до старта API.
 
-Ниже команды исключительно для **новой пустой** базы. Значения окружения должны
-быть экспортированы; пароль можно передать через обычный prompt `psql`.
+Если есть хотя бы одна legacy-запись, миграция завершается ошибкой
+без изменения данных. Не удаляйте volume и не обходите guard: нужен
+отдельный согласованный перенос. Для не-Compose пустой базы порядок явный:
 
 ```bash
 psql -X -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f migrations/initial_001.sql
 psql -X -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f migrations/decisions_002.sql
 ```
 
-Порядок работы с существующей БД — [AI/DATABASE.md](AI/DATABASE.md).
-Автоматический runner и rollback/down-миграции пока не реализованы.
+Порядок работы с существующей БД — [AI/DATABASE.md](AI/DATABASE.md). Общий
+runner для непустых баз и rollback/down-миграции не реализованы.
 
 ## Проверки
 
@@ -108,8 +116,13 @@ psql -X -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAM
 go test ./...
 go vet ./...
 docker compose config --quiet
+docker compose -f docker-compose.yml -f docker-compose.test.yml config --quiet
+./scripts/verify-environment.sh
 git diff --check
 ```
 
-Docker build/runtime, готовность всех бизнес-сценариев и нагрузка проверяются
-отдельно. Проходящие unit-тесты сами по себе не означают готовность MVP.
+`verify-environment.sh` использует только изолированный Compose-проект
+`pulse-backend-t01-test`, проверяет build/runtime, health, SQL-инварианты,
+сохранность PostgreSQL/MinIO после restart и legacy guard, затем удаляет
+этот тестовый проект с volumes. Проходящие проверки T01 не означают
+готовность бизнес-сценариев MVP.
