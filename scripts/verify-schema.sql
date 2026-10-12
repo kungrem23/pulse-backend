@@ -1,5 +1,7 @@
 \set ON_ERROR_STOP on
 
+-- This script is executed only against the isolated Compose test database.
+
 DO $verify$
 DECLARE
     generated_id UUID;

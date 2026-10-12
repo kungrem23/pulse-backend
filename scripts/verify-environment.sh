@@ -7,6 +7,7 @@ cd "$repository_root"
 project_name=pulse-backend-t01-test
 compose_files="-f docker-compose.yml -f docker-compose.test.yml"
 legacy_log=$(mktemp "${TMPDIR:-/tmp}/pulse-legacy-guard.XXXXXX")
+readiness_body=$(mktemp "${TMPDIR:-/tmp}/pulse-readiness.XXXXXX")
 
 compose() {
     # shellcheck disable=SC2086
@@ -15,7 +16,7 @@ compose() {
 
 cleanup() {
     compose down --volumes --remove-orphans >/dev/null 2>&1 || true
-    rm -f "$legacy_log"
+    rm -f "$legacy_log" "$readiness_body"
 }
 trap cleanup EXIT INT TERM
 
@@ -42,6 +43,32 @@ done
 curl --fail --silent --show-error http://127.0.0.1:18080/health/live >/dev/null
 compose exec -T db psql -X -v ON_ERROR_STOP=1 -U pulse_test -d pulse_test \
     < scripts/verify-schema.sql
+
+S3_ENDPOINT=http://127.0.0.1:19000 \
+S3_PUBLIC_ENDPOINT=http://127.0.0.1:19000 \
+S3_BUCKET=pulse-test \
+S3_ACCESS_KEY=pulse-test \
+S3_SECRET_KEY=pulse-test-secret \
+    go test -count=1 -tags=integration ./internal/storage/s3
+
+# The API must become unready when photo storage is unavailable and must not
+# expose the provider error or its private endpoint in the response.
+compose stop minio >/dev/null
+http_code=$(curl --max-time 10 --silent --output "$readiness_body" --write-out '%{http_code}' \
+    http://127.0.0.1:18080/health/ready)
+test "$http_code" = "503"
+grep -q 'dependency is unavailable' "$readiness_body"
+if grep -Eq 'minio|9000|S3|secret' "$readiness_body"; then
+    echo "readiness response leaked storage details" >&2
+    exit 1
+fi
+compose start minio >/dev/null
+attempt=0
+until curl --fail --silent --show-error http://127.0.0.1:18080/health/ready >/dev/null; do
+    attempt=$((attempt + 1))
+    [ "$attempt" -lt 30 ] || { echo "MinIO recovery timed out" >&2; exit 1; }
+    sleep 2
+done
 
 compose exec -T minio /bin/sh -ec '
     mc alias set pulse-local http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
@@ -104,4 +131,4 @@ test "$(compose exec -T db psql -X -Atqc \
 compose exec -T db psql -X -v ON_ERROR_STOP=1 -U pulse_test -d postgres \
     -c 'DROP DATABASE pulse_legacy_guard' >/dev/null
 
-echo "T01 environment verification passed"
+echo "T01/T07 environment and photo storage verification passed"
