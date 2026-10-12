@@ -28,7 +28,6 @@ import (
 type Dependencies struct {
 	Logger     *slog.Logger
 	Database   health.Pinger
-	Tokens     middleware.TokenVerifier
 	Auth       appauth.Service
 	AdminAuth  adminauth.Service
 	Profile    appprofile.Service
@@ -43,16 +42,22 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux := http.NewServeMux()
 	metrics := middleware.NewMetrics()
 
+	var authenticator middleware.Authenticator
+	if deps.Auth != nil {
+		authenticator = deps.Auth
+	}
+	requireUser := middleware.RequireUser(authenticator)
+
 	health.RegisterRoutes(mux, health.NewHandler(deps.Database))
 	mux.Handle("GET /metrics", metrics)
 
-	httpauth.RegisterRoutes(mux, httpauth.NewHandler(deps.Auth, deps.AdminAuth), middleware.RequireUser(deps.Tokens))
-	httpprofile.RegisterRoutes(mux, httpprofile.NewHandler(deps.Profile))
-	httpmedia.RegisterRoutes(mux, httpmedia.NewHandler(deps.Media))
-	httpdiscovery.RegisterRoutes(mux, httpdiscovery.NewHandler(deps.Discovery))
-	httpmatching.RegisterRoutes(mux, httpmatching.NewHandler(deps.Matching))
-	httpchat.RegisterRoutes(mux, httpchat.NewHandler(deps.Chat))
-	httpmoderation.RegisterRoutes(mux, httpmoderation.NewHandler(deps.Moderation))
+	httpauth.RegisterRoutes(mux, httpauth.NewHandler(deps.Auth, deps.AdminAuth), requireUser)
+	httpprofile.RegisterRoutes(mux, httpprofile.NewHandler(deps.Profile), requireUser)
+	httpmedia.RegisterRoutes(mux, httpmedia.NewHandler(deps.Media), requireUser)
+	httpdiscovery.RegisterRoutes(mux, httpdiscovery.NewHandler(deps.Discovery), requireUser)
+	httpmatching.RegisterRoutes(mux, httpmatching.NewHandler(deps.Matching), requireUser)
+	httpchat.RegisterRoutes(mux, httpchat.NewHandler(deps.Chat), requireUser)
+	httpmoderation.RegisterRoutes(mux, httpmoderation.NewHandler(deps.Moderation), requireUser)
 
 	return middleware.Recover(
 		deps.Logger,

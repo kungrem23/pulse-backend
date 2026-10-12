@@ -155,3 +155,36 @@ func TestLogoutRejectsForeignOrWrongToken(t *testing.T) {
 		t.Fatal("rejected logout must not revoke any session")
 	}
 }
+
+func TestAuthenticate(t *testing.T) {
+	service, _, tokens := newSessionTestService(t, domain.User{ID: sessionUserID})
+	user := issueRefreshToken(t, tokens, sessionUserID, security.UserPrincipal)
+	admin := issueRefreshToken(t, tokens, sessionUserID, security.AdminPrincipal)
+	deleted := issueRefreshToken(t, tokens, "00000000-0000-0000-0000-000000000000", security.UserPrincipal)
+
+	userID, err := service.Authenticate(context.Background(), user.AccessToken)
+	if err != nil || userID != sessionUserID {
+		t.Fatalf("expected %q, got %q, %v", sessionUserID, userID, err)
+	}
+	for name, token := range map[string]string{
+		"garbage":       "not-a-jwt",
+		"refresh token": user.RefreshToken,
+		"admin access":  admin.AccessToken,
+		"deleted user":  deleted.AccessToken,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := service.Authenticate(context.Background(), token); !errors.Is(err, ErrInvalidAccessToken) {
+				t.Fatalf("expected ErrInvalidAccessToken, got %v", err)
+			}
+		})
+	}
+}
+
+func TestAuthenticateRejectsBlockedUser(t *testing.T) {
+	service, _, tokens := newSessionTestService(t, domain.User{ID: sessionUserID, IsBlocked: true})
+	pair := issueRefreshToken(t, tokens, sessionUserID, security.UserPrincipal)
+
+	if _, err := service.Authenticate(context.Background(), pair.AccessToken); !errors.Is(err, ErrUserBlocked) {
+		t.Fatalf("a valid JWT of a blocked user must be rejected, got %v", err)
+	}
+}

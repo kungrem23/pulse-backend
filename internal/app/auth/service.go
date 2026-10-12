@@ -20,6 +20,7 @@ var (
 	// ErrInvalidRefreshToken covers malformed, expired, revoked, reused and
 	// foreign refresh tokens alike, so callers cannot tell them apart.
 	ErrInvalidRefreshToken = errors.New("invalid refresh token")
+	ErrInvalidAccessToken  = errors.New("invalid access token")
 )
 
 type RegisterCommand struct {
@@ -60,6 +61,9 @@ type Service interface {
 	Login(context.Context, LoginCommand) (Session, error)
 	Refresh(context.Context, RefreshCommand) (Session, error)
 	Logout(context.Context, LogoutCommand) error
+	// Authenticate returns the ID of the user owning a valid user access token.
+	// It fails with ErrUserBlocked for blocked accounts even if the JWT is valid.
+	Authenticate(ctx context.Context, accessToken string) (string, error)
 }
 
 type PasswordManager interface {

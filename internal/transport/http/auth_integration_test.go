@@ -40,8 +40,18 @@ func newIntegrationServer(t *testing.T) *integrationServer {
 	return &integrationServer{pool: pool, tokens: tokens}
 }
 
-// do builds a new router per request to simulate a server restart: all state lives in PostgreSQL.
+func (s *integrationServer) get(t *testing.T, path, accessToken string) *httptest.ResponseRecorder {
+	t.Helper()
+	return s.request(t, http.MethodGet, path, "", accessToken)
+}
+
 func (s *integrationServer) do(t *testing.T, path, body, accessToken string) *httptest.ResponseRecorder {
+	t.Helper()
+	return s.request(t, http.MethodPost, path, body, accessToken)
+}
+
+// request builds a new router per request to simulate a server restart: all state lives in PostgreSQL.
+func (s *integrationServer) request(t *testing.T, method, path, body, accessToken string) *httptest.ResponseRecorder {
 	t.Helper()
 	passwords, err := security.NewPasswordManager(bcrypt.MinCost)
 	if err != nil {
@@ -50,7 +60,6 @@ func (s *integrationServer) do(t *testing.T, path, body, accessToken string) *ht
 	router := NewRouter(Dependencies{
 		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Database: s.pool,
-		Tokens:   s.tokens,
 		Auth: appauth.NewService(
 			postgres.NewUserRepository(s.pool),
 			postgres.NewRefreshSessionRepository(s.pool),
@@ -59,7 +68,7 @@ func (s *integrationServer) do(t *testing.T, path, body, accessToken string) *ht
 		),
 	})
 	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	request := httptest.NewRequest(method, path, strings.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
 	if accessToken != "" {
 		request.Header.Set("Authorization", "Bearer "+accessToken)

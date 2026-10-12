@@ -1,45 +1,52 @@
 package middleware
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
-	"github.com/kungrem23/pulse-backend/internal/security"
+	appauth "github.com/kungrem23/pulse-backend/internal/app/auth"
 )
 
-func TestRequireUser(t *testing.T) {
-	tokens, err := security.NewTokenIssuer(security.TokenIssuerConfig{
-		Secret:          "test-secret-with-at-least-thirty-two-bytes",
-		Issuer:          "pulse-test",
-		AccessTokenTTL:  time.Minute,
-		RefreshTokenTTL: time.Hour,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	user, _ := tokens.Issue("user-1", security.UserPrincipal)
-	admin, _ := tokens.Issue("admin-1", security.AdminPrincipal)
+type authenticatorStub map[string]error
 
+func (s authenticatorStub) Authenticate(_ context.Context, token string) (string, error) {
+	if err, ok := s[token]; ok {
+		if err != nil {
+			return "", err
+		}
+		return "user-1", nil
+	}
+	return "", appauth.ErrInvalidAccessToken
+}
+
+func TestRequireUser(t *testing.T) {
+	authenticator := authenticatorStub{
+		"valid":   nil,
+		"blocked": appauth.ErrUserBlocked,
+		"broken":  errors.New("database unavailable"),
+	}
 	tests := []struct {
 		name       string
 		header     string
 		wantStatus int
 		wantUserID string
 	}{
-		{"user access token", "Bearer " + user.AccessToken, http.StatusOK, "user-1"},
-		{"lowercase scheme", "bearer " + user.AccessToken, http.StatusOK, "user-1"},
+		{"valid token", "Bearer valid", http.StatusOK, "user-1"},
+		{"lowercase scheme", "bearer valid", http.StatusOK, "user-1"},
 		{"missing header", "", http.StatusUnauthorized, ""},
 		{"empty token", "Bearer ", http.StatusUnauthorized, ""},
-		{"refresh token", "Bearer " + user.RefreshToken, http.StatusUnauthorized, ""},
-		{"admin access token", "Bearer " + admin.AccessToken, http.StatusUnauthorized, ""},
-		{"garbage", "Bearer not-a-jwt", http.StatusUnauthorized, ""},
+		{"wrong scheme", "Basic valid", http.StatusUnauthorized, ""},
+		{"invalid token", "Bearer other", http.StatusUnauthorized, ""},
+		{"blocked user", "Bearer blocked", http.StatusForbidden, ""},
+		{"storage failure", "Bearer broken", http.StatusInternalServerError, ""},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var gotUserID string
-			handler := RequireUser(tokens)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler := RequireUser(authenticator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				gotUserID, _ = UserID(r.Context())
 			}))
 			request := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -56,5 +63,18 @@ func TestRequireUser(t *testing.T) {
 				t.Fatal("401 must carry a WWW-Authenticate challenge")
 			}
 		})
+	}
+}
+
+func TestRequireUserWithoutAuthenticatorFailsClosed(t *testing.T) {
+	called := false
+	handler := RequireUser(nil)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true }))
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.Header.Set("Authorization", "Bearer valid")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if called || response.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 without reaching the handler, got %d", response.Code)
 	}
 }

@@ -77,6 +77,24 @@ func (s *service) Logout(ctx context.Context, command LogoutCommand) error {
 	return nil
 }
 
+func (s *service) Authenticate(ctx context.Context, accessToken string) (string, error) {
+	claims, err := s.tokens.Verify(accessToken, security.AccessToken)
+	if err != nil || claims.Principal != security.UserPrincipal {
+		return "", ErrInvalidAccessToken
+	}
+	user, err := s.users.ByID(ctx, claims.Subject)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return "", ErrInvalidAccessToken
+		}
+		return "", fmt.Errorf("find authenticated user: %w", err)
+	}
+	if user.IsBlocked {
+		return "", ErrUserBlocked
+	}
+	return user.ID, nil
+}
+
 func (s *service) verifyUserRefreshToken(rawToken string) (security.Claims, error) {
 	claims, err := s.tokens.Verify(rawToken, security.RefreshToken)
 	if err != nil || claims.Principal != security.UserPrincipal {

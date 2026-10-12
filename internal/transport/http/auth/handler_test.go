@@ -13,7 +13,6 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/app/adminauth"
 	appauth "github.com/kungrem23/pulse-backend/internal/app/auth"
 	"github.com/kungrem23/pulse-backend/internal/domain"
-	"github.com/kungrem23/pulse-backend/internal/security"
 	"github.com/kungrem23/pulse-backend/internal/transport/http/middleware"
 )
 
@@ -282,18 +281,20 @@ func TestRefreshMapsResults(t *testing.T) {
 	}
 }
 
-func TestLogoutTakesUserFromVerifiedAccessToken(t *testing.T) {
-	tokens := newHandlerTestTokenIssuer(t)
-	pair, err := tokens.Issue("user-from-token", security.UserPrincipal)
-	if err != nil {
-		t.Fatal(err)
+func (s *authServiceStub) Authenticate(_ context.Context, token string) (string, error) {
+	if token == "valid-access" {
+		return "user-from-token", nil
 	}
+	return "", appauth.ErrInvalidAccessToken
+}
+
+func TestLogoutTakesUserFromVerifiedAccessToken(t *testing.T) {
 	service := &authServiceStub{}
 	mux := http.NewServeMux()
-	RegisterRoutes(mux, NewHandler(service, nil), middleware.RequireUser(tokens))
+	RegisterRoutes(mux, NewHandler(service, nil), middleware.RequireUser(service))
 
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", bytes.NewBufferString(`{"refresh_token":"refresh"}`))
-	request.Header.Set("Authorization", "Bearer "+pair.AccessToken)
+	request.Header.Set("Authorization", "Bearer valid-access")
 	response := httptest.NewRecorder()
 	mux.ServeHTTP(response, request)
 
@@ -306,16 +307,10 @@ func TestLogoutTakesUserFromVerifiedAccessToken(t *testing.T) {
 }
 
 func TestLogoutRejectsMissingOrWrongToken(t *testing.T) {
-	tokens := newHandlerTestTokenIssuer(t)
-	pair, err := tokens.Issue("user-from-token", security.UserPrincipal)
-	if err != nil {
-		t.Fatal(err)
-	}
 	for name, header := range map[string]string{
 		"missing":               "",
-		"refresh token":         "Bearer " + pair.RefreshToken,
-		"wrong scheme":          "Basic " + pair.AccessToken,
-		"invalid refresh token": "Bearer " + pair.AccessToken,
+		"invalid access token":  "Bearer forged",
+		"invalid refresh token": "Bearer valid-access",
 	} {
 		t.Run(name, func(t *testing.T) {
 			service := &authServiceStub{}
@@ -323,7 +318,7 @@ func TestLogoutRejectsMissingOrWrongToken(t *testing.T) {
 				service.logoutErr = appauth.ErrInvalidRefreshToken
 			}
 			mux := http.NewServeMux()
-			RegisterRoutes(mux, NewHandler(service, nil), middleware.RequireUser(tokens))
+			RegisterRoutes(mux, NewHandler(service, nil), middleware.RequireUser(service))
 			request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", bytes.NewBufferString(`{"refresh_token":"refresh"}`))
 			if header != "" {
 				request.Header.Set("Authorization", header)
@@ -339,18 +334,4 @@ func TestLogoutRejectsMissingOrWrongToken(t *testing.T) {
 			}
 		})
 	}
-}
-
-func newHandlerTestTokenIssuer(t *testing.T) *security.TokenIssuer {
-	t.Helper()
-	tokens, err := security.NewTokenIssuer(security.TokenIssuerConfig{
-		Secret:          "test-secret-with-at-least-thirty-two-bytes",
-		Issuer:          "pulse-test",
-		AccessTokenTTL:  time.Minute,
-		RefreshTokenTTL: time.Hour,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return tokens
 }

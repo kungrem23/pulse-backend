@@ -2,9 +2,9 @@ package profile
 
 import "net/http"
 
-func RegisterRoutes(mux *http.ServeMux, handler *Handler) {
-	mux.HandleFunc("GET /api/v1/profile", handler.Get)
-	mux.HandleFunc("PUT /api/v1/profile", handler.Update)
-	mux.HandleFunc("PUT /api/v1/preferences", handler.UpdatePreferences)
-	mux.HandleFunc("PATCH /api/v1/profile/sleep", handler.SetSleep)
+func RegisterRoutes(mux *http.ServeMux, handler *Handler, requireUser func(http.Handler) http.Handler) {
+	mux.Handle("GET /api/v1/profile", requireUser(http.HandlerFunc(handler.Get)))
+	mux.Handle("PUT /api/v1/profile", requireUser(http.HandlerFunc(handler.Update)))
+	mux.Handle("PUT /api/v1/preferences", requireUser(http.HandlerFunc(handler.UpdatePreferences)))
+	mux.Handle("PATCH /api/v1/profile/sleep", requireUser(http.HandlerFunc(handler.SetSleep)))
 }
