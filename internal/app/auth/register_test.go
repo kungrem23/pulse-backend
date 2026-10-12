@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/example/pulse-backend/internal/domain"
-	"github.com/example/pulse-backend/internal/security"
+	"github.com/kungrem23/pulse-backend/internal/domain"
+	"github.com/kungrem23/pulse-backend/internal/security"
 )
 
 func TestRegisterCreatesUserAndIssuesSession(t *testing.T) {
@@ -18,6 +18,7 @@ func TestRegisterCreatesUserAndIssuesSession(t *testing.T) {
 		createdUser: domain.User{
 			ID:           "6130ce38-a239-447c-b65a-a2019b370962",
 			Email:        "user@example.com",
+			Age:          18,
 			PasswordHash: "must-not-leave-the-service",
 			CreatedAt:    time.Date(2026, time.September, 21, 12, 0, 0, 0, time.UTC),
 		},
@@ -27,12 +28,16 @@ func TestRegisterCreatesUserAndIssuesSession(t *testing.T) {
 	registration, err := service.Register(context.Background(), RegisterCommand{
 		Email:    "  User@Example.COM  ",
 		Password: "correct-password",
+		Age:      18,
 	})
 	if err != nil {
 		t.Fatalf("register: %v", err)
 	}
 	if repository.createInput.Email != "user@example.com" {
 		t.Fatalf("created email: want user@example.com, got %q", repository.createInput.Email)
+	}
+	if repository.createInput.Age != 18 || registration.User.Age != 18 {
+		t.Fatal("registration must store and return the declared age")
 	}
 	if repository.createInput.PasswordHash == "" || repository.createInput.PasswordHash == "correct-password" {
 		t.Fatal("repository must receive a password hash, not plaintext")
@@ -61,9 +66,13 @@ func TestRegisterValidatesInputBeforeHashing(t *testing.T) {
 		command  RegisterCommand
 		expected error
 	}{
-		{name: "invalid email", command: RegisterCommand{Email: "not-an-email", Password: "correct-password"}, expected: ErrInvalidEmail},
-		{name: "short password", command: RegisterCommand{Email: "user@example.com", Password: "short"}, expected: ErrInvalidPassword},
-		{name: "bcrypt byte limit", command: RegisterCommand{Email: "user@example.com", Password: strings.Repeat("я", 37)}, expected: ErrInvalidPassword},
+		{name: "missing age", command: RegisterCommand{Email: "user@example.com", Password: "correct-password"}, expected: ErrInvalidAge},
+		{name: "underage", command: RegisterCommand{Email: "user@example.com", Password: "correct-password", Age: 17}, expected: ErrInvalidAge},
+		{name: "negative age", command: RegisterCommand{Email: "user@example.com", Password: "correct-password", Age: -1}, expected: ErrInvalidAge},
+		{name: "above maximum", command: RegisterCommand{Email: "user@example.com", Password: "correct-password", Age: 121}, expected: ErrInvalidAge},
+		{name: "invalid email", command: RegisterCommand{Email: "not-an-email", Password: "correct-password", Age: 18}, expected: ErrInvalidEmail},
+		{name: "short password", command: RegisterCommand{Email: "user@example.com", Password: "short", Age: 18}, expected: ErrInvalidPassword},
+		{name: "bcrypt byte limit", command: RegisterCommand{Email: "user@example.com", Password: strings.Repeat("я", 37), Age: 18}, expected: ErrInvalidPassword},
 	}
 
 	for _, test := range tests {
@@ -93,9 +102,28 @@ func TestRegisterMapsEmailConflict(t *testing.T) {
 	_, err := service.Register(context.Background(), RegisterCommand{
 		Email:    "user@example.com",
 		Password: "correct-password",
+		Age:      18,
 	})
 	if !errors.Is(err, ErrEmailAlreadyExists) {
 		t.Fatalf("expected ErrEmailAlreadyExists, got %v", err)
+	}
+}
+
+func TestRegisterAcceptsAgeBoundaries(t *testing.T) {
+	for _, age := range []int{domain.MinAge, domain.MaxAge} {
+		repository := &userRepositoryStub{createdUser: domain.User{
+			ID: "6130ce38-a239-447c-b65a-a2019b370962", Age: age,
+		}}
+		service := NewService(repository, &passwordManagerStub{hash: "hash"}, &tokenIssuerStub{})
+		_, err := service.Register(context.Background(), RegisterCommand{
+			Email: "user@example.com", Password: "correct-password", Age: age,
+		})
+		if err != nil {
+			t.Fatalf("age %d must be accepted: %v", age, err)
+		}
+		if repository.createCalls != 1 || repository.createInput.Age != age {
+			t.Fatalf("age %d was not stored", age)
+		}
 	}
 }
 
@@ -110,6 +138,7 @@ func TestRegisterPropagatesTokenIssuerFailure(t *testing.T) {
 	_, err := service.Register(context.Background(), RegisterCommand{
 		Email:    "user@example.com",
 		Password: "correct-password",
+		Age:      18,
 	})
 	if !errors.Is(err, issuerError) {
 		t.Fatalf("expected token issuer error, got %v", err)

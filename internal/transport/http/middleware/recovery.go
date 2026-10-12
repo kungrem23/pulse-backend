@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/example/pulse-backend/internal/transport/http/httpx"
+	"github.com/kungrem23/pulse-backend/internal/transport/http/httpx"
 )
 
 func Recover(logger *slog.Logger, next http.Handler) http.Handler {

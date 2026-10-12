@@ -3,8 +3,8 @@ package discovery
 import (
 	"net/http"
 
-	appdiscovery "github.com/example/pulse-backend/internal/app/discovery"
-	"github.com/example/pulse-backend/internal/transport/http/httpx"
+	appdiscovery "github.com/kungrem23/pulse-backend/internal/app/discovery"
+	"github.com/kungrem23/pulse-backend/internal/transport/http/httpx"
 )
 
 type Handler struct {

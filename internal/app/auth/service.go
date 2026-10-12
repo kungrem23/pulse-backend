@@ -6,14 +6,15 @@ import (
 	"errors"
 	"time"
 
-	"github.com/example/pulse-backend/internal/domain"
-	"github.com/example/pulse-backend/internal/security"
+	"github.com/kungrem23/pulse-backend/internal/domain"
+	"github.com/kungrem23/pulse-backend/internal/security"
 )
 
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrInvalidEmail       = errors.New("invalid email")
 	ErrInvalidPassword    = errors.New("invalid password")
+	ErrInvalidAge         = errors.New("age must be between 18 and 120")
 	ErrEmailAlreadyExists = errors.New("email already exists")
 	ErrUserBlocked        = errors.New("user is blocked")
 )
@@ -21,6 +22,7 @@ var (
 type RegisterCommand struct {
 	Email    string
 	Password string
+	Age      int
 }
 
 type LoginCommand struct {

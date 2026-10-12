@@ -4,7 +4,7 @@ package media
 import (
 	"context"
 
-	"github.com/example/pulse-backend/internal/domain"
+	"github.com/kungrem23/pulse-backend/internal/domain"
 )
 
 type UploadCommand struct {

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/example/pulse-backend/internal/domain"
-	"github.com/example/pulse-backend/internal/security"
+	"github.com/kungrem23/pulse-backend/internal/domain"
+	"github.com/kungrem23/pulse-backend/internal/security"
 )
 
 // dummyAdminPasswordHash has the same bcrypt work factor as production hashes.

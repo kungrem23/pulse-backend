@@ -6,6 +6,7 @@ type swipeRequest struct {
 }
 
 type swipeResponse struct {
-	Matched bool   `json:"matched"`
-	MatchID string `json:"match_id,omitempty"`
+	Matched        bool   `json:"matched"`
+	MatchID        string `json:"match_id,omitempty"`
+	ConversationID string `json:"conversation_id,omitempty"`
 }

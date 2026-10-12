@@ -3,8 +3,8 @@ package media
 import (
 	"net/http"
 
-	appmedia "github.com/example/pulse-backend/internal/app/media"
-	"github.com/example/pulse-backend/internal/transport/http/httpx"
+	appmedia "github.com/kungrem23/pulse-backend/internal/app/media"
+	"github.com/kungrem23/pulse-backend/internal/transport/http/httpx"
 )
 
 type Handler struct {

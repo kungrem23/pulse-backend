@@ -1,4 +1,4 @@
-module github.com/example/pulse-backend
+module github.com/kungrem23/pulse-backend
 
 go 1.23
 

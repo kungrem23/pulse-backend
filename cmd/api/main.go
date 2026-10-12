@@ -9,9 +9,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/example/pulse-backend/internal/config"
-	"github.com/example/pulse-backend/internal/platform/database"
-	httpapi "github.com/example/pulse-backend/internal/transport/http"
+	"github.com/kungrem23/pulse-backend/internal/config"
+	"github.com/kungrem23/pulse-backend/internal/platform/database"
+	httpapi "github.com/kungrem23/pulse-backend/internal/transport/http"
 )
 
 func main() {

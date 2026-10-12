@@ -1,7 +1,8 @@
 openapi: 3.1.0
 info:
   title: Pulse API
-  version: 0.1.0
+  version: 0.2.0
+  x-current-release: mvp
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -11,6 +12,10 @@ info:
     Dating conversations are separate resources created from mutual matches.
     Closing a match disables new messages but does not delete message history.
     Administrative notifications are not part of dating conversations.
+    MVP includes authentication and session lifecycle, profiles, photos,
+    preferences, discovery, swipes, and match lists. Chat, match closure, and
+    moderation are later releases. A pair can match only once, even after closure.
+    Release annotations describe scope, not implementation completeness.
 servers:
   - url: /
     description: Current Pulse API host
@@ -40,6 +45,8 @@ paths:
     get:
       tags: [Health]
       operationId: getLiveness
+      x-release: infrastructure
+      x-implementation-status: implemented
       summary: Check whether the API process is running
       security: []
       responses:
@@ -56,6 +63,8 @@ paths:
     get:
       tags: [Health]
       operationId: getReadiness
+      x-release: infrastructure
+      x-implementation-status: implemented
       summary: Check whether the API is ready to serve traffic
       security: []
       responses:
@@ -78,6 +87,8 @@ paths:
     post:
       tags: [Auth]
       operationId: registerUser
+      x-release: mvp
+      x-implementation-status: partial
       summary: Register a user
       security: []
       requestBody:
@@ -87,6 +98,8 @@ paths:
             schema:
               $ref: "#/components/schemas/RegisterRequest"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "201":
           description: User registered and session created
           content:
@@ -108,6 +121,8 @@ paths:
     post:
       tags: [Auth]
       operationId: loginUser
+      x-release: mvp
+      x-implementation-status: partial
       summary: Authenticate a user
       security: []
       requestBody:
@@ -117,6 +132,8 @@ paths:
             schema:
               $ref: "#/components/schemas/LoginRequest"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "200":
           description: Authentication successful
           content:
@@ -131,11 +148,15 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /api/v1/admin/auth/login:
     post:
       tags: [Auth, Admin]
       operationId: loginAdmin
+      x-release: moderation
+      x-implementation-status: partial
       summary: Authenticate an administrator
       security: []
       requestBody:
@@ -145,6 +166,8 @@ paths:
             schema:
               $ref: "#/components/schemas/AdminLoginRequest"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "200":
           description: Authentication successful
           content:
@@ -157,11 +180,15 @@ paths:
           $ref: "#/components/responses/InvalidCredentials"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /api/v1/auth/refresh:
     post:
       tags: [Auth]
       operationId: refreshSession
+      x-release: mvp
+      x-implementation-status: placeholder
       summary: Rotate a refresh token and issue a new session
       description: The supplied refresh token becomes invalid after a successful rotation.
       security: []
@@ -172,6 +199,8 @@ paths:
             schema:
               $ref: "#/components/schemas/RefreshRequest"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "200":
           description: New token pair issued
           content:
@@ -189,6 +218,8 @@ paths:
     post:
       tags: [Auth]
       operationId: logout
+      x-release: mvp
+      x-implementation-status: placeholder
       summary: Revoke a refresh session
       security:
         - bearerAuth: []
@@ -199,6 +230,8 @@ paths:
             schema:
               $ref: "#/components/schemas/RefreshRequest"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "204":
           description: Session revoked
         "400":
@@ -210,11 +243,15 @@ paths:
     get:
       tags: [Profile]
       operationId: getOwnProfile
+      x-release: mvp
+      x-implementation-status: placeholder
       summary: Get the current user's profile
       x-required-principal: user
       security:
         - bearerAuth: []
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "200":
           description: Profile, preferences, and photos
           content:
@@ -230,6 +267,8 @@ paths:
     put:
       tags: [Profile]
       operationId: putOwnProfile
+      x-release: mvp
+      x-implementation-status: placeholder
       summary: Create or replace the current user's profile
       x-required-principal: user
       security:
@@ -241,6 +280,8 @@ paths:
             schema:
               $ref: "#/components/schemas/PutProfileRequest"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "200":
           description: Profile saved
           content:
@@ -260,6 +301,8 @@ paths:
     put:
       tags: [Profile]
       operationId: putOwnPreferences
+      x-release: mvp
+      x-implementation-status: placeholder
       summary: Create or replace discovery preferences
       x-required-principal: user
       security:
@@ -271,6 +314,8 @@ paths:
             schema:
               $ref: "#/components/schemas/PutPreferencesRequest"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "200":
           description: Preferences saved
           content:
@@ -290,6 +335,8 @@ paths:
     patch:
       tags: [Profile]
       operationId: setProfileSleepMode
+      x-release: mvp
+      x-implementation-status: placeholder
       summary: Enable or disable sleep mode
       x-required-principal: user
       security:
@@ -301,6 +348,8 @@ paths:
             schema:
               $ref: "#/components/schemas/SetSleepRequest"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "200":
           description: Sleep mode updated
           content:
@@ -318,6 +367,8 @@ paths:
     post:
       tags: [Photos]
       operationId: uploadPhoto
+      x-release: mvp
+      x-implementation-status: placeholder
       summary: Upload a profile photo
       x-required-principal: user
       security:
@@ -329,6 +380,8 @@ paths:
             schema:
               $ref: "#/components/schemas/UploadPhotoRequest"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "201":
           description: Photo uploaded
           content:
@@ -354,11 +407,15 @@ paths:
     delete:
       tags: [Photos]
       operationId: deletePhoto
+      x-release: mvp
+      x-implementation-status: placeholder
       summary: Delete one of the current user's photos
       x-required-principal: user
       security:
         - bearerAuth: []
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "204":
           description: Photo deleted
         "401":
@@ -372,7 +429,15 @@ paths:
     get:
       tags: [Discovery]
       operationId: getDiscoveryFeed
+      x-release: mvp
+      x-implementation-status: placeholder
       summary: Get profile recommendations
+      description: |
+        Requires a completed profile, preferences, at least one photo, and sleep
+        mode disabled. Applies both users' age and sex preferences. Excludes
+        self, sleeping or blocked users, previously swiped users, and every
+        existing match pair including closed pairs. Returns an empty items
+        array when exhausted; MVP does not reset swipe history.
       x-required-principal: user
       security:
         - bearerAuth: []
@@ -380,6 +445,8 @@ paths:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "200":
           description: A page of candidates
           content:
@@ -397,6 +464,8 @@ paths:
     post:
       tags: [Matching]
       operationId: createSwipe
+      x-release: mvp
+      x-implementation-status: placeholder
       summary: Like or dislike a user
       description: Saving the swipe and creating a mutual match are atomic.
       x-required-principal: user
@@ -409,6 +478,8 @@ paths:
             schema:
               $ref: "#/components/schemas/SwipeRequest"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "200":
           description: Swipe saved
           content:
@@ -432,6 +503,8 @@ paths:
     get:
       tags: [Matching]
       operationId: listMatches
+      x-release: mvp
+      x-implementation-status: placeholder
       summary: List the current user's matches
       x-required-principal: user
       security:
@@ -440,6 +513,8 @@ paths:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "200":
           description: A page of matches
           content:
@@ -453,10 +528,40 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/v1/matches/{match_id}:
+    parameters:
+      - $ref: "#/components/parameters/MatchID"
+    delete:
+      tags: [Matching]
+      operationId: closeMatch
+      x-release: chat
+      x-implementation-status: placeholder
+      summary: Permanently close a match
+      description: |
+        Preserves the match, conversation, and message history. Both users may
+        read existing history, but neither may send new dating messages. The
+        pair stays excluded from discovery and cannot match again.
+      x-required-principal: user
+      security:
+        - bearerAuth: []
+      responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+        "204":
+          description: Match closed; repeated closure is idempotent
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /api/v1/conversations:
     get:
       tags: [Conversations]
       operationId: listConversations
+      x-release: chat
+      x-implementation-status: placeholder
       summary: List conversations available to the current user
       description: Includes dating conversations and, if present, support conversations.
       x-required-principal: user
@@ -466,6 +571,8 @@ paths:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "200":
           description: A page of conversations
           content:
@@ -485,6 +592,8 @@ paths:
     get:
       tags: [Conversations]
       operationId: listMessages
+      x-release: chat
+      x-implementation-status: placeholder
       summary: Get conversation history
       x-required-principal: user
       security:
@@ -493,6 +602,8 @@ paths:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/MessageLimit"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "200":
           description: A page of messages ordered from newest to oldest
           content:
@@ -510,6 +621,8 @@ paths:
     post:
       tags: [Conversations]
       operationId: sendMessage
+      x-release: chat
+      x-implementation-status: placeholder
       summary: Send a message to a conversation
       description: A dating conversation must be active and both users must remain allowed to communicate.
       x-required-principal: user
@@ -522,6 +635,8 @@ paths:
             schema:
               $ref: "#/components/schemas/SendMessageRequest"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "201":
           description: Message created
           content:
@@ -545,6 +660,8 @@ paths:
     post:
       tags: [Reports]
       operationId: createReport
+      x-release: moderation
+      x-implementation-status: placeholder
       summary: Report another user
       x-required-principal: user
       security:
@@ -556,6 +673,8 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateReportRequest"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "201":
           description: Report created
           content:
@@ -579,6 +698,8 @@ paths:
     get:
       tags: [Admin]
       operationId: listReports
+      x-release: moderation
+      x-implementation-status: placeholder
       summary: List moderation reports
       x-required-principal: admin
       security:
@@ -588,6 +709,8 @@ paths:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "200":
           description: A page of reports
           content:
@@ -607,6 +730,8 @@ paths:
     patch:
       tags: [Admin]
       operationId: processReport
+      x-release: moderation
+      x-implementation-status: placeholder
       summary: Process or reject a moderation report
       x-required-principal: admin
       security:
@@ -618,6 +743,8 @@ paths:
             schema:
               $ref: "#/components/schemas/ProcessReportRequest"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "200":
           description: Report updated
           content:
@@ -643,11 +770,15 @@ paths:
     get:
       tags: [Admin]
       operationId: inspectUser
+      x-release: moderation
+      x-implementation-status: placeholder
       summary: Inspect a user for moderation
       x-required-principal: admin
       security:
         - bearerAuth: []
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "200":
           description: User moderation view
           content:
@@ -667,6 +798,8 @@ paths:
     post:
       tags: [Admin]
       operationId: blockUser
+      x-release: moderation
+      x-implementation-status: placeholder
       summary: Block a user
       x-required-principal: admin
       security:
@@ -678,6 +811,8 @@ paths:
             schema:
               $ref: "#/components/schemas/BlockUserRequest"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "200":
           description: User blocked
           content:
@@ -701,6 +836,8 @@ paths:
     post:
       tags: [Admin]
       operationId: sendAdminMessage
+      x-release: moderation
+      x-implementation-status: placeholder
       summary: Send a support message to a user
       description: Creates or reuses a support conversation; it never writes to a dating conversation.
       x-required-principal: admin
@@ -713,6 +850,8 @@ paths:
             schema:
               $ref: "#/components/schemas/AdminMessageRequest"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "201":
           description: Support message created
           content:
@@ -736,6 +875,8 @@ paths:
     post:
       tags: [Admin]
       operationId: notifyUser
+      x-release: moderation
+      x-implementation-status: placeholder
       summary: Queue a one-way system notification
       description: The notification is not a chat message and does not create a conversation.
       x-required-principal: admin
@@ -748,6 +889,8 @@ paths:
             schema:
               $ref: "#/components/schemas/NotificationRequest"
       responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
         "202":
           description: Notification accepted for delivery
           content:
@@ -820,6 +963,13 @@ components:
         format: uuid
     ConversationID:
       name: conversation_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MatchID:
+      name: match_id
       in: path
       required: true
       schema:
@@ -917,6 +1067,13 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
 
+    NotImplemented:
+      description: Route exists as a placeholder; the use case is not implemented
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
   schemas:
     HealthResponse:
       type: object
@@ -957,7 +1114,7 @@ components:
     RegisterRequest:
       type: object
       additionalProperties: false
-      required: [email, password]
+      required: [email, password, age]
       properties:
         email:
           type: string
@@ -969,6 +1126,11 @@ components:
           minLength: 8
           maxLength: 72
           description: Must contain no more than 72 UTF-8 bytes because bcrypt is used.
+        age:
+          type: integer
+          minimum: 18
+          maximum: 120
+          description: Required declared age. Invalid age prevents registration before any user is created.
 
     LoginRequest:
       type: object
@@ -1046,7 +1208,7 @@ components:
     User:
       type: object
       additionalProperties: false
-      required: [id, email, is_blocked, created_at]
+      required: [id, email, age, is_blocked, created_at]
       properties:
         id:
           type: string
@@ -1054,6 +1216,10 @@ components:
         email:
           type: string
           format: email
+        age:
+          type: integer
+          minimum: 18
+          maximum: 120
         is_blocked:
           type: boolean
         created_at:
@@ -1062,12 +1228,16 @@ components:
 
     Sex:
       type: string
-      enum: [male, female, other]
+      enum: [male, female]
+
+    SearchSex:
+      type: string
+      enum: [male, female, any]
 
     PutProfileRequest:
       type: object
       additionalProperties: false
-      required: [name, birth_date, sex, city]
+      required: [name, age, sex, city]
       properties:
         name:
           type: string
@@ -1077,9 +1247,11 @@ components:
           type: string
           maxLength: 500
           default: ""
-        birth_date:
-          type: string
-          format: date
+        age:
+          type: integer
+          minimum: 18
+          maximum: 120
+          description: Updates the single stored age in users.age; date of birth is not collected.
         sex:
           $ref: "#/components/schemas/Sex"
         city:
@@ -1113,7 +1285,7 @@ components:
     PutPreferencesRequest:
       type: object
       additionalProperties: false
-      required: [min_age, max_age, interested_in]
+      required: [min_age, max_age, sex]
       properties:
         min_age:
           type: integer
@@ -1123,17 +1295,13 @@ components:
           type: integer
           minimum: 18
           maximum: 120
-        interested_in:
-          type: array
-          minItems: 1
-          uniqueItems: true
-          items:
-            $ref: "#/components/schemas/Sex"
+        sex:
+          $ref: "#/components/schemas/SearchSex"
 
     Preferences:
       type: object
       additionalProperties: false
-      required: [user_id, min_age, max_age, interested_in]
+      required: [user_id, min_age, max_age, sex]
       properties:
         user_id:
           type: string
@@ -1146,12 +1314,8 @@ components:
           type: integer
           minimum: 18
           maximum: 120
-        interested_in:
-          type: array
-          minItems: 1
-          uniqueItems: true
-          items:
-            $ref: "#/components/schemas/Sex"
+        sex:
+          $ref: "#/components/schemas/SearchSex"
 
     ProfileView:
       type: object
@@ -1164,7 +1328,7 @@ components:
           $ref: "#/components/schemas/Preferences"
         photos:
           type: array
-          maxItems: 6
+          maxItems: 5
           items:
             $ref: "#/components/schemas/Photo"
 
@@ -1192,11 +1356,11 @@ components:
         file:
           type: string
           format: binary
-          description: JPEG, PNG, or WebP image, at most 10 MiB.
+          description: JPEG, PNG, or WebP image, at most 10 MiB (10485760 bytes).
         position:
           type: integer
           minimum: 1
-          maximum: 6
+          maximum: 5
 
     Photo:
       type: object
@@ -1213,7 +1377,7 @@ components:
         position:
           type: integer
           minimum: 1
-          maximum: 6
+          maximum: 5
 
     PublicUserSummary:
       type: object
@@ -1303,7 +1467,7 @@ components:
     MatchSummary:
       type: object
       additionalProperties: false
-      required: [id, conversation_id, status, created_at, user, unread_count]
+      required: [id, status, created_at, user]
       properties:
         id:
           type: string
@@ -1311,6 +1475,7 @@ components:
         conversation_id:
           type: string
           format: uuid
+          description: Post-MVP; present once a separate dating conversation has been created.
         status:
           $ref: "#/components/schemas/MatchStatus"
         created_at:

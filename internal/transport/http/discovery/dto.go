@@ -6,9 +6,17 @@ type feedResponse struct {
 }
 
 type candidateResponse struct {
-	UserID string   `json:"user_id"`
-	Name   string   `json:"name"`
-	Bio    string   `json:"bio"`
-	Age    int      `json:"age"`
-	Photos []string `json:"photos"`
+	UserID string          `json:"user_id"`
+	Name   string          `json:"name"`
+	Bio    string          `json:"bio"`
+	Age    int             `json:"age"`
+	Sex    string          `json:"sex"`
+	City   string          `json:"city"`
+	Photos []photoResponse `json:"photos"`
+}
+
+type photoResponse struct {
+	ID       string `json:"id"`
+	URL      string `json:"url"`
+	Position int16  `json:"position"`
 }

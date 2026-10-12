@@ -4,7 +4,7 @@ package profile
 import (
 	"context"
 
-	"github.com/example/pulse-backend/internal/domain"
+	"github.com/kungrem23/pulse-backend/internal/domain"
 )
 
 type View struct {

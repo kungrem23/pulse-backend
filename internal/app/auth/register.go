@@ -8,8 +8,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/example/pulse-backend/internal/domain"
-	"github.com/example/pulse-backend/internal/security"
+	"github.com/kungrem23/pulse-backend/internal/domain"
+	"github.com/kungrem23/pulse-backend/internal/security"
 )
 
 const (
@@ -19,6 +19,9 @@ const (
 )
 
 func (s *service) Register(ctx context.Context, command RegisterCommand) (Registration, error) {
+	if command.Age < domain.MinAge || command.Age > domain.MaxAge {
+		return Registration{}, ErrInvalidAge
+	}
 	email, err := normalizeEmail(command.Email)
 	if err != nil {
 		return Registration{}, ErrInvalidEmail
@@ -34,6 +37,7 @@ func (s *service) Register(ctx context.Context, command RegisterCommand) (Regist
 
 	user, err := s.users.Create(ctx, domain.User{
 		Email:        email,
+		Age:          command.Age,
 		PasswordHash: passwordHash,
 	})
 	if err != nil {

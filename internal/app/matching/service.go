@@ -4,7 +4,7 @@ package matching
 import (
 	"context"
 
-	"github.com/example/pulse-backend/internal/domain"
+	"github.com/kungrem23/pulse-backend/internal/domain"
 )
 
 type SwipeCommand struct {
@@ -15,5 +15,7 @@ type SwipeCommand struct {
 
 type Service interface {
 	Swipe(context.Context, SwipeCommand) (*domain.Match, error)
-	List(context.Context, string, int) ([]domain.Match, error)
+	List(context.Context, string, domain.PageRequest) (domain.Page[domain.Match], error)
+	// Close is post-MVP. The pair remains permanently excluded from discovery.
+	Close(context.Context, string, string) error
 }

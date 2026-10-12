@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/example/pulse-backend/internal/transport/http/httpx"
+	"github.com/kungrem23/pulse-backend/internal/transport/http/httpx"
 )
 
 type Pinger interface {

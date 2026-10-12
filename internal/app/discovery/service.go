@@ -4,7 +4,7 @@ package discovery
 import (
 	"context"
 
-	"github.com/example/pulse-backend/internal/domain"
+	"github.com/kungrem23/pulse-backend/internal/domain"
 )
 
 type Candidate struct {
@@ -13,5 +13,5 @@ type Candidate struct {
 }
 
 type Service interface {
-	Feed(context.Context, string, int) ([]Candidate, error)
+	Feed(context.Context, string, domain.PageRequest) (domain.Page[Candidate], error)
 }

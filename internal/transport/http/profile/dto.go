@@ -1,11 +1,11 @@
 package profile
 
 type updateRequest struct {
-	Name      string `json:"name"`
-	Bio       string `json:"bio"`
-	BirthDate string `json:"birth_date"`
-	Sex       string `json:"sex"`
-	City      string `json:"city"`
+	Name string `json:"name"`
+	Bio  string `json:"bio"`
+	Age  int    `json:"age"`
+	Sex  string `json:"sex"`
+	City string `json:"city"`
 }
 
 type updatePreferencesRequest struct {

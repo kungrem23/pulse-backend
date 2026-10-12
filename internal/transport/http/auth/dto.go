@@ -3,12 +3,13 @@ package auth
 import (
 	"time"
 
-	"github.com/example/pulse-backend/internal/domain"
+	"github.com/kungrem23/pulse-backend/internal/domain"
 )
 
 type registerRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	Age      int    `json:"age"`
 }
 
 type userLoginRequest struct {

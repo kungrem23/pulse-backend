@@ -6,9 +6,9 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/example/pulse-backend/internal/app/adminauth"
-	appauth "github.com/example/pulse-backend/internal/app/auth"
-	"github.com/example/pulse-backend/internal/transport/http/httpx"
+	"github.com/kungrem23/pulse-backend/internal/app/adminauth"
+	appauth "github.com/kungrem23/pulse-backend/internal/app/auth"
+	"github.com/kungrem23/pulse-backend/internal/transport/http/httpx"
 )
 
 type Handler struct {
@@ -37,9 +37,12 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	registration, err := h.service.Register(r.Context(), appauth.RegisterCommand{
 		Email:    request.Email,
 		Password: request.Password,
+		Age:      request.Age,
 	})
 	if err != nil {
 		switch {
+		case errors.Is(err, appauth.ErrInvalidAge):
+			httpx.Error(w, http.StatusUnprocessableEntity, "age must be between 18 and 120")
 		case errors.Is(err, appauth.ErrInvalidEmail):
 			httpx.Error(w, http.StatusUnprocessableEntity, "invalid email")
 		case errors.Is(err, appauth.ErrInvalidPassword):
@@ -76,7 +79,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, appauth.ErrInvalidCredentials):
-			httpx.Error(w, http.StatusUnauthorized, "invalid credentials")
+			httpx.ErrorCode(w, http.StatusUnauthorized, "invalid_credentials", "invalid credentials")
 		case errors.Is(err, appauth.ErrUserBlocked):
 			httpx.Error(w, http.StatusForbidden, "user is blocked")
 		default:
@@ -105,7 +108,7 @@ func (h *Handler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, adminauth.ErrInvalidCredentials) {
-			httpx.Error(w, http.StatusUnauthorized, "invalid credentials")
+			httpx.ErrorCode(w, http.StatusUnauthorized, "invalid_credentials", "invalid credentials")
 		} else {
 			httpx.Error(w, http.StatusInternalServerError, "internal server error")
 		}
@@ -136,6 +139,15 @@ func userSessionResponse(session appauth.Session) sessionResponse {
 		AccessExpiresAt:  session.AccessExpiresAt,
 		RefreshExpiresAt: session.RefreshExpiresAt,
 	}
+}
+
+// Session persistence and refresh-token rotation are the next auth slice.
+func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
+	httpx.NotImplemented("rotate refresh session").ServeHTTP(w, r)
+}
+
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	httpx.NotImplemented("revoke refresh session").ServeHTTP(w, r)
 }
 
 func adminSessionResponse(session adminauth.Session) sessionResponse {
