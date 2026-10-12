@@ -17,6 +17,10 @@ type userLoginRequest struct {
 	Password string `json:"password"`
 }
 
+type refreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
 type adminLoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`

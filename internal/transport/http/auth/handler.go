@@ -9,6 +9,7 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/app/adminauth"
 	appauth "github.com/kungrem23/pulse-backend/internal/app/auth"
 	"github.com/kungrem23/pulse-backend/internal/transport/http/httpx"
+	"github.com/kungrem23/pulse-backend/internal/transport/http/middleware"
 )
 
 type Handler struct {
@@ -143,13 +144,58 @@ func userSessionResponse(session appauth.Session) sessionResponse {
 	}
 }
 
-// Session persistence and refresh-token rotation are the next auth slice.
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
-	httpx.NotImplemented("rotate refresh session").ServeHTTP(w, r)
+	var request refreshRequest
+	if err := decodeJSON(r, &request); err != nil || request.RefreshToken == "" {
+		httpx.Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if h.service == nil {
+		httpx.Error(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	session, err := h.service.Refresh(r.Context(), appauth.RefreshCommand{RefreshToken: request.RefreshToken})
+	if err != nil {
+		// A blocked account gets the same 401 as an invalid token; login reports the block.
+		if errors.Is(err, appauth.ErrInvalidRefreshToken) || errors.Is(err, appauth.ErrUserBlocked) {
+			httpx.Error(w, http.StatusUnauthorized, "invalid refresh token")
+		} else {
+			httpx.Error(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, userSessionResponse(session))
 }
 
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
-	httpx.NotImplemented("revoke refresh session").ServeHTTP(w, r)
+	userID, ok := middleware.UserID(r.Context())
+	if !ok {
+		httpx.Error(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	var request refreshRequest
+	if err := decodeJSON(r, &request); err != nil || request.RefreshToken == "" {
+		httpx.Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if h.service == nil {
+		httpx.Error(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	err := h.service.Logout(r.Context(), appauth.LogoutCommand{UserID: userID, RefreshToken: request.RefreshToken})
+	if err != nil {
+		if errors.Is(err, appauth.ErrInvalidRefreshToken) {
+			httpx.Error(w, http.StatusUnauthorized, "invalid refresh token")
+		} else {
+			httpx.Error(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func adminSessionResponse(session adminauth.Session) sessionResponse {

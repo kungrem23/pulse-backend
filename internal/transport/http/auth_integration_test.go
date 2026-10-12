@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
 	appauth "github.com/kungrem23/pulse-backend/internal/app/auth"
@@ -19,12 +20,14 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/testsupport/pgtest"
 )
 
-func TestAuthHTTPWithPostgres(t *testing.T) {
+type integrationServer struct {
+	pool   *pgxpool.Pool
+	tokens *security.TokenIssuer
+}
+
+func newIntegrationServer(t *testing.T) *integrationServer {
+	t.Helper()
 	pool := pgtest.NewDatabase(t)
-	passwords, err := security.NewPasswordManager(bcrypt.MinCost)
-	if err != nil {
-		t.Fatal(err)
-	}
 	tokens, err := security.NewTokenIssuer(security.TokenIssuerConfig{
 		Secret:          strings.Repeat("s", 32),
 		Issuer:          "pulse-test",
@@ -34,20 +37,42 @@ func TestAuthHTTPWithPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A new router per request simulates a server restart: all state lives in PostgreSQL.
-	newServer := func() http.Handler {
-		return NewRouter(Dependencies{
-			Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
-			Database: pool,
-			Auth:     appauth.NewService(postgres.NewUserRepository(pool), passwords, tokens),
-		})
+	return &integrationServer{pool: pool, tokens: tokens}
+}
+
+// do builds a new router per request to simulate a server restart: all state lives in PostgreSQL.
+func (s *integrationServer) do(t *testing.T, path, body, accessToken string) *httptest.ResponseRecorder {
+	t.Helper()
+	passwords, err := security.NewPasswordManager(bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
 	}
+	router := NewRouter(Dependencies{
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Database: s.pool,
+		Tokens:   s.tokens,
+		Auth: appauth.NewService(
+			postgres.NewUserRepository(s.pool),
+			postgres.NewRefreshSessionRepository(s.pool),
+			passwords,
+			s.tokens,
+		),
+	})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	if accessToken != "" {
+		request.Header.Set("Authorization", "Bearer "+accessToken)
+	}
+	router.ServeHTTP(response, request)
+	return response
+}
+
+func TestAuthHTTPWithPostgres(t *testing.T) {
+	server := newIntegrationServer(t)
+	pool, tokens := server.pool, server.tokens
 	post := func(path, body string) *httptest.ResponseRecorder {
-		response := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
-		request.Header.Set("Content-Type", "application/json")
-		newServer().ServeHTTP(response, request)
-		return response
+		return server.do(t, path, body, "")
 	}
 	userCount := func() int {
 		var count int

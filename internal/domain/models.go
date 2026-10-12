@@ -52,6 +52,13 @@ type User struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+// RefreshSession stores only a hash of the refresh credential, never the raw token.
+type RefreshSession struct {
+	UserID    string
+	TokenHash string
+	ExpiresAt time.Time
+}
+
 type Profile struct {
 	UserID     string `json:"user_id"`
 	Name       string `json:"name"`

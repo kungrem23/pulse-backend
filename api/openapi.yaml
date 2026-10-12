@@ -184,9 +184,12 @@ paths:
       tags: [Auth]
       operationId: refreshSession
       x-release: mvp
-      x-implementation-status: placeholder
+      x-implementation-status: partial
       summary: Rotate a refresh token and issue a new session
-      description: The supplied refresh token becomes invalid after a successful rotation.
+      description: |
+        The supplied refresh token becomes invalid after a successful rotation.
+        Of concurrent requests with the same refresh token only one succeeds.
+        A blocked account receives 401 here; login reports the block as 403.
       security: []
       requestBody:
         required: true
@@ -195,8 +198,6 @@ paths:
             schema:
               $ref: "#/components/schemas/RefreshRequest"
       responses:
-        "501":
-          $ref: "#/components/responses/NotImplemented"
         "200":
           description: New token pair issued
           content:
@@ -215,8 +216,12 @@ paths:
       tags: [Auth]
       operationId: logout
       x-release: mvp
-      x-implementation-status: placeholder
+      x-implementation-status: partial
       summary: Revoke a refresh session
+      description: |
+        Revokes the caller's refresh session. The refresh token must belong to the
+        user of the access token, otherwise 401. Repeating logout returns 204.
+        Already issued access tokens stay valid until they expire.
       security:
         - bearerAuth: []
       requestBody:
@@ -226,8 +231,6 @@ paths:
             schema:
               $ref: "#/components/schemas/RefreshRequest"
       responses:
-        "501":
-          $ref: "#/components/responses/NotImplemented"
         "204":
           description: Session revoked
         "400":

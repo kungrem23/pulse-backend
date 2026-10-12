@@ -38,10 +38,5 @@ func (s *service) Login(ctx context.Context, command LoginCommand) (Session, err
 		return Session{}, ErrUserBlocked
 	}
 
-	tokenPair, err := s.tokens.Issue(user.ID, security.UserPrincipal)
-	if err != nil {
-		return Session{}, fmt.Errorf("issue user session: %w", err)
-	}
-
-	return sessionFromTokenPair(tokenPair), nil
+	return s.startSession(ctx, user.ID)
 }

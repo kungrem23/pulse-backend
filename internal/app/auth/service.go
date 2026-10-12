@@ -17,6 +17,9 @@ var (
 	ErrInvalidAge         = errors.New("age must be between 18 and 120")
 	ErrEmailAlreadyExists = errors.New("email already exists")
 	ErrUserBlocked        = errors.New("user is blocked")
+	// ErrInvalidRefreshToken covers malformed, expired, revoked, reused and
+	// foreign refresh tokens alike, so callers cannot tell them apart.
+	ErrInvalidRefreshToken = errors.New("invalid refresh token")
 )
 
 type RegisterCommand struct {
@@ -28,6 +31,16 @@ type RegisterCommand struct {
 type LoginCommand struct {
 	Email    string
 	Password string
+}
+
+type RefreshCommand struct {
+	RefreshToken string
+}
+
+// LogoutCommand.UserID must come from a verified access token.
+type LogoutCommand struct {
+	UserID       string
+	RefreshToken string
 }
 
 type Session struct {
@@ -45,6 +58,8 @@ type Registration struct {
 type Service interface {
 	Register(context.Context, RegisterCommand) (Registration, error)
 	Login(context.Context, LoginCommand) (Session, error)
+	Refresh(context.Context, RefreshCommand) (Session, error)
+	Logout(context.Context, LogoutCommand) error
 }
 
 type PasswordManager interface {
@@ -54,17 +69,25 @@ type PasswordManager interface {
 
 type TokenIssuer interface {
 	Issue(subject string, principal security.PrincipalType) (security.TokenPair, error)
+	Verify(rawToken string, expectedType security.TokenType) (security.Claims, error)
 }
 
 type service struct {
 	users     domain.UserRepository
+	sessions  domain.RefreshSessionRepository
 	passwords PasswordManager
 	tokens    TokenIssuer
 }
 
-func NewService(users domain.UserRepository, passwords PasswordManager, tokens TokenIssuer) Service {
+func NewService(
+	users domain.UserRepository,
+	sessions domain.RefreshSessionRepository,
+	passwords PasswordManager,
+	tokens TokenIssuer,
+) Service {
 	return &service{
 		users:     users,
+		sessions:  sessions,
 		passwords: passwords,
 		tokens:    tokens,
 	}

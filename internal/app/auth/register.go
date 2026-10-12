@@ -47,16 +47,16 @@ func (s *service) Register(ctx context.Context, command RegisterCommand) (Regist
 		return Registration{}, fmt.Errorf("create user: %w", err)
 	}
 
-	tokenPair, err := s.tokens.Issue(user.ID, security.UserPrincipal)
+	session, err := s.startSession(ctx, user.ID)
 	if err != nil {
-		return Registration{}, fmt.Errorf("issue user session: %w", err)
+		return Registration{}, err
 	}
 
 	// A password hash is never needed outside authentication internals.
 	user.PasswordHash = ""
 	return Registration{
 		User:    user,
-		Session: sessionFromTokenPair(tokenPair),
+		Session: session,
 	}, nil
 }
 

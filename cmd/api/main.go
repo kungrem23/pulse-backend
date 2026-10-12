@@ -50,8 +50,10 @@ func main() {
 		Handler: httpapi.NewRouter(httpapi.Dependencies{
 			Logger:   logger,
 			Database: db,
+			Tokens:   tokens,
 			Auth: appauth.NewService(
 				postgres.NewUserRepository(db),
+				postgres.NewRefreshSessionRepository(db),
 				security.NewDefaultPasswordManager(),
 				tokens,
 			),

@@ -13,6 +13,8 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/app/adminauth"
 	appauth "github.com/kungrem23/pulse-backend/internal/app/auth"
 	"github.com/kungrem23/pulse-backend/internal/domain"
+	"github.com/kungrem23/pulse-backend/internal/security"
+	"github.com/kungrem23/pulse-backend/internal/transport/http/middleware"
 )
 
 type authServiceStub struct {
@@ -24,6 +26,23 @@ type authServiceStub struct {
 	loginCommand    appauth.LoginCommand
 	registerCalls   int
 	loginCalls      int
+	refreshResult   appauth.Session
+	refreshErr      error
+	refreshCommand  appauth.RefreshCommand
+	logoutErr       error
+	logoutCommand   appauth.LogoutCommand
+	logoutCalls     int
+}
+
+func (s *authServiceStub) Refresh(_ context.Context, command appauth.RefreshCommand) (appauth.Session, error) {
+	s.refreshCommand = command
+	return s.refreshResult, s.refreshErr
+}
+
+func (s *authServiceStub) Logout(_ context.Context, command appauth.LogoutCommand) error {
+	s.logoutCalls++
+	s.logoutCommand = command
+	return s.logoutErr
 }
 
 func (s *authServiceStub) Register(_ context.Context, command appauth.RegisterCommand) (appauth.Registration, error) {
@@ -230,4 +249,108 @@ func TestInvalidJSONDoesNotCallService(t *testing.T) {
 	if service.loginCalls != 0 {
 		t.Fatalf("expected no service calls, got %d", service.loginCalls)
 	}
+}
+
+func TestRefreshMapsResults(t *testing.T) {
+	tests := []struct {
+		name       string
+		body       string
+		err        error
+		wantStatus int
+	}{
+		{name: "rotated", body: `{"refresh_token":"old"}`, wantStatus: http.StatusOK},
+		{name: "empty token", body: `{"refresh_token":""}`, wantStatus: http.StatusBadRequest},
+		{name: "invalid token", body: `{"refresh_token":"old"}`, err: appauth.ErrInvalidRefreshToken, wantStatus: http.StatusUnauthorized},
+		{name: "blocked user", body: `{"refresh_token":"old"}`, err: appauth.ErrUserBlocked, wantStatus: http.StatusUnauthorized},
+		{name: "unexpected", body: `{"refresh_token":"old"}`, err: errors.New("database unavailable"), wantStatus: http.StatusInternalServerError},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			service := &authServiceStub{refreshErr: test.err, refreshResult: appauth.Session{AccessToken: "new-access"}}
+			request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh", bytes.NewBufferString(test.body))
+			response := httptest.NewRecorder()
+
+			NewHandler(service, nil).Refresh(response, request)
+
+			if response.Code != test.wantStatus {
+				t.Fatalf("expected status %d, got %d: %s", test.wantStatus, response.Code, response.Body.String())
+			}
+			if test.wantStatus == http.StatusOK && service.refreshCommand.RefreshToken != "old" {
+				t.Fatalf("unexpected command: %+v", service.refreshCommand)
+			}
+		})
+	}
+}
+
+func TestLogoutTakesUserFromVerifiedAccessToken(t *testing.T) {
+	tokens := newHandlerTestTokenIssuer(t)
+	pair, err := tokens.Issue("user-from-token", security.UserPrincipal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := &authServiceStub{}
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, NewHandler(service, nil), middleware.RequireUser(tokens))
+
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", bytes.NewBufferString(`{"refresh_token":"refresh"}`))
+	request.Header.Set("Authorization", "Bearer "+pair.AccessToken)
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+
+	if response.Code != http.StatusNoContent || response.Body.Len() != 0 {
+		t.Fatalf("expected empty 204, got %d: %s", response.Code, response.Body.String())
+	}
+	if service.logoutCommand != (appauth.LogoutCommand{UserID: "user-from-token", RefreshToken: "refresh"}) {
+		t.Fatalf("unexpected command: %+v", service.logoutCommand)
+	}
+}
+
+func TestLogoutRejectsMissingOrWrongToken(t *testing.T) {
+	tokens := newHandlerTestTokenIssuer(t)
+	pair, err := tokens.Issue("user-from-token", security.UserPrincipal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, header := range map[string]string{
+		"missing":               "",
+		"refresh token":         "Bearer " + pair.RefreshToken,
+		"wrong scheme":          "Basic " + pair.AccessToken,
+		"invalid refresh token": "Bearer " + pair.AccessToken,
+	} {
+		t.Run(name, func(t *testing.T) {
+			service := &authServiceStub{}
+			if name == "invalid refresh token" {
+				service.logoutErr = appauth.ErrInvalidRefreshToken
+			}
+			mux := http.NewServeMux()
+			RegisterRoutes(mux, NewHandler(service, nil), middleware.RequireUser(tokens))
+			request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", bytes.NewBufferString(`{"refresh_token":"refresh"}`))
+			if header != "" {
+				request.Header.Set("Authorization", header)
+			}
+			response := httptest.NewRecorder()
+			mux.ServeHTTP(response, request)
+
+			if response.Code != http.StatusUnauthorized {
+				t.Fatalf("expected 401, got %d: %s", response.Code, response.Body.String())
+			}
+			if name != "invalid refresh token" && service.logoutCalls != 0 {
+				t.Fatal("unauthenticated request must not reach the service")
+			}
+		})
+	}
+}
+
+func newHandlerTestTokenIssuer(t *testing.T) *security.TokenIssuer {
+	t.Helper()
+	tokens, err := security.NewTokenIssuer(security.TokenIssuerConfig{
+		Secret:          "test-secret-with-at-least-thirty-two-bytes",
+		Issuer:          "pulse-test",
+		AccessTokenTTL:  time.Minute,
+		RefreshTokenTTL: time.Hour,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tokens
 }

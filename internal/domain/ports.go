@@ -14,6 +14,16 @@ type UserRepository interface {
 	ByID(context.Context, string) (User, error)
 }
 
+type RefreshSessionRepository interface {
+	Create(context.Context, RefreshSession) error
+	// Rotate atomically revokes the user's active, unexpired session with
+	// oldTokenHash and stores next. Returns ErrNotFound when no such session
+	// exists; of concurrent rotations of one session, only one succeeds.
+	Rotate(ctx context.Context, oldTokenHash string, next RefreshSession) error
+	// Revoke is idempotent: an absent or already revoked session is not an error.
+	Revoke(ctx context.Context, userID, tokenHash string) error
+}
+
 type ProfileRepository interface {
 	// Upsert updates users.age and the profile/preferences in one transaction.
 	Upsert(context.Context, Profile, Preferences) error

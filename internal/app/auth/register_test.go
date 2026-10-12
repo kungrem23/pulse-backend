@@ -23,7 +23,7 @@ func TestRegisterCreatesUserAndIssuesSession(t *testing.T) {
 			CreatedAt:    time.Date(2026, time.September, 21, 12, 0, 0, 0, time.UTC),
 		},
 	}
-	service := NewService(repository, passwords, tokens)
+	service := NewService(repository, &sessionRepositoryStub{}, passwords, tokens)
 
 	registration, err := service.Register(context.Background(), RegisterCommand{
 		Email:    "  User@Example.COM  ",
@@ -79,7 +79,7 @@ func TestRegisterValidatesInputBeforeHashing(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			repository := &userRepositoryStub{}
 			passwords := &passwordManagerStub{}
-			service := NewService(repository, passwords, &tokenIssuerStub{})
+			service := NewService(repository, &sessionRepositoryStub{}, passwords, &tokenIssuerStub{})
 
 			_, err := service.Register(context.Background(), test.command)
 			if !errors.Is(err, test.expected) {
@@ -95,6 +95,7 @@ func TestRegisterValidatesInputBeforeHashing(t *testing.T) {
 func TestRegisterMapsEmailConflict(t *testing.T) {
 	service := NewService(
 		&userRepositoryStub{createErr: domain.ErrConflict},
+		&sessionRepositoryStub{},
 		&passwordManagerStub{hash: "password-hash"},
 		&tokenIssuerStub{},
 	)
@@ -114,7 +115,7 @@ func TestRegisterAcceptsAgeBoundaries(t *testing.T) {
 		repository := &userRepositoryStub{createdUser: domain.User{
 			ID: "6130ce38-a239-447c-b65a-a2019b370962", Age: age,
 		}}
-		service := NewService(repository, &passwordManagerStub{hash: "hash"}, &tokenIssuerStub{})
+		service := NewService(repository, &sessionRepositoryStub{}, &passwordManagerStub{hash: "hash"}, &tokenIssuerStub{})
 		_, err := service.Register(context.Background(), RegisterCommand{
 			Email: "user@example.com", Password: "correct-password", Age: age,
 		})
@@ -131,6 +132,7 @@ func TestRegisterPropagatesTokenIssuerFailure(t *testing.T) {
 	issuerError := errors.New("signing failed")
 	service := NewService(
 		&userRepositoryStub{createdUser: domain.User{ID: "user-id"}},
+		&sessionRepositoryStub{},
 		&passwordManagerStub{hash: "password-hash"},
 		&tokenIssuerStub{err: issuerError},
 	)

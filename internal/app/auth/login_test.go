@@ -24,7 +24,7 @@ func TestLoginIssuesUserSession(t *testing.T) {
 			PasswordHash: passwordHash,
 		},
 	}
-	service := NewService(repository, passwords, tokens)
+	service := NewService(repository, &sessionRepositoryStub{}, passwords, tokens)
 
 	session, err := service.Login(context.Background(), LoginCommand{
 		Email:    "  User@Example.COM  ",
@@ -53,6 +53,7 @@ func TestLoginRejectsWrongPassword(t *testing.T) {
 	}
 	service := NewService(
 		&userRepositoryStub{byEmailUser: domain.User{ID: "user-id", PasswordHash: passwordHash}},
+		&sessionRepositoryStub{},
 		passwords,
 		newTestTokenIssuer(t),
 	)
@@ -70,6 +71,7 @@ func TestLoginHidesUnknownEmail(t *testing.T) {
 	passwords := &passwordManagerStub{verifyErr: security.ErrPasswordMismatch}
 	service := NewService(
 		&userRepositoryStub{byEmailErr: domain.ErrNotFound},
+		&sessionRepositoryStub{},
 		passwords,
 		&tokenIssuerStub{},
 	)
@@ -104,6 +106,7 @@ func TestLoginReturnsBlockedOnlyForCorrectPassword(t *testing.T) {
 	}
 	service := NewService(
 		&userRepositoryStub{byEmailUser: domain.User{ID: "user-id", PasswordHash: passwordHash, IsBlocked: true}},
+		&sessionRepositoryStub{},
 		passwords,
 		&tokenIssuerStub{},
 	)

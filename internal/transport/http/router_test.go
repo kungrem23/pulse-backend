@@ -28,8 +28,6 @@ func TestContractPlaceholderRoutesAreRegistered(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	router := NewRouter(Dependencies{Logger: logger})
 	for _, route := range []struct{ method, path string }{
-		{http.MethodPost, "/api/v1/auth/refresh"},
-		{http.MethodPost, "/api/v1/auth/logout"},
 		{http.MethodGet, "/api/v1/conversations"},
 		{http.MethodGet, "/api/v1/conversations/6130ce38-a239-447c-b65a-a2019b370962/messages"},
 		{http.MethodPost, "/api/v1/conversations/6130ce38-a239-447c-b65a-a2019b370962/messages"},

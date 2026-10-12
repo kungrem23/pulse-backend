@@ -19,6 +19,7 @@ type userRepositoryStub struct {
 	byEmailCalls   int
 	createInput    domain.User
 	requestedEmail string
+	byIDUser       domain.User
 }
 
 func (r *userRepositoryStub) Create(_ context.Context, user domain.User) (domain.User, error) {
@@ -33,8 +34,42 @@ func (r *userRepositoryStub) ByEmail(_ context.Context, email string) (domain.Us
 	return r.byEmailUser, r.byEmailErr
 }
 
-func (r *userRepositoryStub) ByID(_ context.Context, _ string) (domain.User, error) {
-	return domain.User{}, domain.ErrNotFound
+func (r *userRepositoryStub) ByID(_ context.Context, id string) (domain.User, error) {
+	if r.byIDUser.ID == "" || r.byIDUser.ID != id {
+		return domain.User{}, domain.ErrNotFound
+	}
+	return r.byIDUser, nil
+}
+
+type sessionRepositoryStub struct {
+	created     []domain.RefreshSession
+	createErr   error
+	rotateErr   error
+	rotateCalls int
+	rotatedHash string
+	rotatedNext domain.RefreshSession
+	revokeCalls int
+	revokedUser string
+	revokedHash string
+}
+
+func (r *sessionRepositoryStub) Create(_ context.Context, session domain.RefreshSession) error {
+	r.created = append(r.created, session)
+	return r.createErr
+}
+
+func (r *sessionRepositoryStub) Rotate(_ context.Context, oldTokenHash string, next domain.RefreshSession) error {
+	r.rotateCalls++
+	r.rotatedHash = oldTokenHash
+	r.rotatedNext = next
+	return r.rotateErr
+}
+
+func (r *sessionRepositoryStub) Revoke(_ context.Context, userID, tokenHash string) error {
+	r.revokeCalls++
+	r.revokedUser = userID
+	r.revokedHash = tokenHash
+	return nil
 }
 
 type passwordManagerStub struct {
@@ -73,6 +108,10 @@ func (i *tokenIssuerStub) Issue(subject string, principal security.PrincipalType
 	i.subject = subject
 	i.principal = principal
 	return i.pair, i.err
+}
+
+func (i *tokenIssuerStub) Verify(string, security.TokenType) (security.Claims, error) {
+	return security.Claims{}, security.ErrInvalidToken
 }
 
 func newTestPasswordManager(t *testing.T) *security.PasswordManager {
