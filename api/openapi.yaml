@@ -382,7 +382,7 @@ paths:
       tags: [Photos]
       operationId: uploadPhoto
       x-release: mvp
-      x-implementation-status: placeholder
+      x-implementation-status: partial
       summary: Upload a profile photo
       x-required-principal: user
       security:
@@ -422,7 +422,7 @@ paths:
       tags: [Photos]
       operationId: deletePhoto
       x-release: mvp
-      x-implementation-status: placeholder
+      x-implementation-status: partial
       summary: Delete one of the current user's photos
       x-required-principal: user
       security:

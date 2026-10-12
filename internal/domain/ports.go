@@ -40,6 +40,15 @@ type ProfileRepository interface {
 	SetSleep(ctx context.Context, userID string, isSleeping bool) (bool, error)
 }
 
+// PhotoRepository stores private object keys. Implementations must enforce
+// ownership in read/delete operations and map a duplicate (user, position)
+// to ErrConflict. SQL details belong to the PostgreSQL adapter.
+type PhotoRepository interface {
+	Create(context.Context, Photo) error
+	ByIDForUser(context.Context, string, string) (Photo, error)
+	Delete(context.Context, string, string) error
+}
+
 type SwipeRepository interface {
 	// Save atomically stores a swipe and a unique match. Closed pairs cannot rematch.
 	Save(context.Context, string, string, bool) (*Match, error)
