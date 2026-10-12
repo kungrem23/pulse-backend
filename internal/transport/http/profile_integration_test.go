@@ -101,10 +101,8 @@ func TestProfileWithPostgres(t *testing.T) {
 		t.Fatalf("invalid update must not change anything:\nbefore %s\nafter  %s", before, after)
 	}
 
-	if _, err := server.pool.Exec(ctx,
-		"INSERT INTO preferences (user_id, min_age, max_age, sex) VALUES ($1, 25, 35, 'any')", userA); err != nil {
-		t.Fatal(err)
-	}
+	expect(server.put(t, "/api/v1/preferences", `{"min_age":25,"max_age":35,"sex":"any"}`, tokenA).Code,
+		http.StatusOK, "set preferences", "")
 	if body := server.get(t, "/api/v1/profile", tokenA).Body.String(); !strings.Contains(body, `"min_age":25,"max_age":35,"sex":"any"`) {
 		t.Fatalf("stored preferences must be returned: %s", body)
 	}

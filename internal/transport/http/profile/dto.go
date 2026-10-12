@@ -14,12 +14,18 @@ type updateRequest struct {
 }
 
 type updatePreferencesRequest struct {
-	MinAge int16  `json:"min_age"`
-	MaxAge int16  `json:"max_age"`
+	MinAge int    `json:"min_age"`
+	MaxAge int    `json:"max_age"`
 	Sex    string `json:"sex"`
 }
 
+// IsSleeping is a pointer so that a missing field is rejected instead of
+// silently waking the profile up.
 type setSleepRequest struct {
+	IsSleeping *bool `json:"is_sleeping"`
+}
+
+type sleepResponse struct {
 	IsSleeping bool `json:"is_sleeping"`
 }
 
@@ -64,18 +70,22 @@ func newProfileResponse(profile domain.Profile) profileResponse {
 	}
 }
 
+func newPreferencesResponse(preferences domain.Preferences) *preferencesResponse {
+	return &preferencesResponse{
+		UserID: preferences.UserID,
+		MinAge: preferences.MinAge,
+		MaxAge: preferences.MaxAge,
+		Sex:    string(preferences.Sex),
+	}
+}
+
 func newViewResponse(view appprofile.View) viewResponse {
 	response := viewResponse{
 		Profile: newProfileResponse(view.Profile),
 		Photos:  []photoResponse{},
 	}
 	if view.Preferences != nil {
-		response.Preferences = &preferencesResponse{
-			UserID: view.Preferences.UserID,
-			MinAge: view.Preferences.MinAge,
-			MaxAge: view.Preferences.MaxAge,
-			Sex:    string(view.Preferences.Sex),
-		}
+		response.Preferences = newPreferencesResponse(*view.Preferences)
 	}
 	return response
 }

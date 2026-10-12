@@ -33,6 +33,11 @@ type ProfileRepository interface {
 	ByUserID(context.Context, string) (Profile, error)
 	// Preferences returns ErrNotFound until the user has set them.
 	Preferences(context.Context, string) (Preferences, error)
+	// SavePreferences creates or replaces preferences. Returns ErrNotFound if
+	// the user has no profile yet.
+	SavePreferences(context.Context, Preferences) (Preferences, error)
+	// SetSleep returns the stored state, or ErrNotFound if there is no profile.
+	SetSleep(ctx context.Context, userID string, isSleeping bool) (bool, error)
 }
 
 type SwipeRepository interface {

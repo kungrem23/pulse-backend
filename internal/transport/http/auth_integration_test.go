@@ -51,6 +51,11 @@ func (s *integrationServer) put(t *testing.T, path, body, accessToken string) *h
 	return s.request(t, http.MethodPut, path, body, accessToken)
 }
 
+func (s *integrationServer) patch(t *testing.T, path, body, accessToken string) *httptest.ResponseRecorder {
+	t.Helper()
+	return s.request(t, http.MethodPatch, path, body, accessToken)
+}
+
 func (s *integrationServer) do(t *testing.T, path, body, accessToken string) *httptest.ResponseRecorder {
 	t.Helper()
 	return s.request(t, http.MethodPost, path, body, accessToken)

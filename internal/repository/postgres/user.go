@@ -14,6 +14,7 @@ import (
 
 const (
 	uniqueViolation           = "23505"
+	foreignKeyViolation       = "23503"
 	invalidTextRepresentation = "22P02"
 )
 

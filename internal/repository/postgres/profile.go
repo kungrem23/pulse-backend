@@ -32,6 +32,17 @@ const (
 	// Params: $1 user_id.
 	// Returns zero or one row: user_id (UUID as text), min_age, max_age, sex.
 	preferencesByUserIDQuery = ""
+
+	// Params: $1 user_id, $2 min_age, $3 max_age, $4 sex.
+	// Creates or replaces the user's preferences in a single statement.
+	// Without a profile it must fail with foreign_key_violation (23503).
+	// Returns one row: user_id (UUID as text), min_age, max_age, sex.
+	upsertPreferencesQuery = ""
+
+	// Params: $1 user_id, $2 is_sleeping.
+	// Sets profiles.is_sleeping and updated_at. Returns zero rows if there is
+	// no profile, otherwise one row: is_sleeping.
+	setSleepQuery = ""
 )
 
 type ProfileRepository struct {
@@ -104,6 +115,36 @@ func (r *ProfileRepository) Preferences(ctx context.Context, userID string) (dom
 	}
 	preferences.Sex = domain.SearchSex(sex)
 	return preferences, nil
+}
+
+func (r *ProfileRepository) SavePreferences(ctx context.Context, preferences domain.Preferences) (domain.Preferences, error) {
+	if upsertPreferencesQuery == "" {
+		return domain.Preferences{}, fmt.Errorf("save preferences: %w", errQueryNotWritten)
+	}
+	var saved domain.Preferences
+	var sex string
+	err := r.pool.QueryRow(ctx, upsertPreferencesQuery,
+		preferences.UserID, preferences.MinAge, preferences.MaxAge, string(preferences.Sex),
+	).Scan(&saved.UserID, &saved.MinAge, &saved.MaxAge, &sex)
+	if err != nil {
+		if pgErrorCode(err) == foreignKeyViolation {
+			return domain.Preferences{}, fmt.Errorf("save preferences: %w", domain.ErrNotFound)
+		}
+		return domain.Preferences{}, notFoundOr("save preferences", err)
+	}
+	saved.Sex = domain.SearchSex(sex)
+	return saved, nil
+}
+
+func (r *ProfileRepository) SetSleep(ctx context.Context, userID string, isSleeping bool) (bool, error) {
+	if setSleepQuery == "" {
+		return false, fmt.Errorf("set sleep mode: %w", errQueryNotWritten)
+	}
+	var stored bool
+	if err := r.pool.QueryRow(ctx, setSleepQuery, userID, isSleeping).Scan(&stored); err != nil {
+		return false, notFoundOr("set sleep mode", err)
+	}
+	return stored, nil
 }
 
 // notFoundOr maps a missing row or a malformed UUID to domain.ErrNotFound.

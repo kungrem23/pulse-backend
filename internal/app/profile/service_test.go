@@ -16,6 +16,9 @@ type profileRepositoryStub struct {
 	preferencesErr error
 	saveErr        error
 	saved          []domain.Profile
+
+	savedPreferences []domain.Preferences
+	sleepCalls       int
 }
 
 func (r *profileRepositoryStub) Save(_ context.Context, profile domain.Profile) (domain.Profile, error) {
@@ -29,6 +32,16 @@ func (r *profileRepositoryStub) Save(_ context.Context, profile domain.Profile) 
 
 func (r *profileRepositoryStub) ByUserID(context.Context, string) (domain.Profile, error) {
 	return r.profile, r.profileErr
+}
+
+func (r *profileRepositoryStub) SavePreferences(_ context.Context, preferences domain.Preferences) (domain.Preferences, error) {
+	r.savedPreferences = append(r.savedPreferences, preferences)
+	return preferences, r.saveErr
+}
+
+func (r *profileRepositoryStub) SetSleep(_ context.Context, _ string, isSleeping bool) (bool, error) {
+	r.sleepCalls++
+	return isSleeping, r.saveErr
 }
 
 func (r *profileRepositoryStub) Preferences(context.Context, string) (domain.Preferences, error) {
@@ -149,4 +162,71 @@ func TestGet(t *testing.T) {
 			t.Fatalf("expected an internal error, got %v", err)
 		}
 	})
+}
+
+func TestUpdatePreferences(t *testing.T) {
+	valid := PreferencesCommand{UserID: "user-1", MinAge: 18, MaxAge: 120, Sex: "any"}
+	repository := &profileRepositoryStub{}
+	saved, err := NewService(repository).UpdatePreferences(context.Background(), valid)
+	want := domain.Preferences{UserID: "user-1", MinAge: 18, MaxAge: 120, Sex: domain.SearchSexAny}
+	if err != nil || saved != want || len(repository.savedPreferences) != 1 {
+		t.Fatalf("unexpected result %+v, %v", saved, err)
+	}
+
+	for _, ok := range []PreferencesCommand{
+		{UserID: "u", MinAge: 25, MaxAge: 25, Sex: "male"},
+		{UserID: "u", MinAge: 30, MaxAge: 40, Sex: "female"},
+	} {
+		if _, err := NewService(&profileRepositoryStub{}).UpdatePreferences(context.Background(), ok); err != nil {
+			t.Fatalf("%+v must be accepted, got %v", ok, err)
+		}
+	}
+
+	tests := []struct {
+		name    string
+		command PreferencesCommand
+		field   string
+	}{
+		{"missing fields", PreferencesCommand{UserID: "u"}, "min_age"},
+		{"min below 18", PreferencesCommand{MinAge: 17, MaxAge: 30, Sex: "any"}, "min_age"},
+		{"max above 120", PreferencesCommand{MinAge: 18, MaxAge: 121, Sex: "any"}, "max_age"},
+		{"min above max", PreferencesCommand{MinAge: 31, MaxAge: 30, Sex: "any"}, "min_age"},
+		{"int16 overflow", PreferencesCommand{MinAge: 18, MaxAge: 65554, Sex: "any"}, "max_age"},
+		{"missing sex", PreferencesCommand{MinAge: 18, MaxAge: 30}, "sex"},
+		{"sex other", PreferencesCommand{MinAge: 18, MaxAge: 30, Sex: "other"}, "sex"},
+		{"sex in another case", PreferencesCommand{MinAge: 18, MaxAge: 30, Sex: "Any"}, "sex"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repository := &profileRepositoryStub{}
+			_, err := NewService(repository).UpdatePreferences(context.Background(), test.command)
+			var validation *ValidationError
+			if !errors.As(err, &validation) || validation.Field != test.field {
+				t.Fatalf("expected validation error for %s, got %v", test.field, err)
+			}
+			if len(repository.savedPreferences) != 0 {
+				t.Fatal("invalid preferences must not reach the repository")
+			}
+		})
+	}
+}
+
+func TestPreferencesAndSleepRequireProfile(t *testing.T) {
+	service := NewService(&profileRepositoryStub{saveErr: domain.ErrNotFound})
+	_, err := service.UpdatePreferences(context.Background(), PreferencesCommand{UserID: "u", MinAge: 18, MaxAge: 30, Sex: "any"})
+	if !errors.Is(err, ErrProfileRequired) {
+		t.Fatalf("expected ErrProfileRequired for preferences, got %v", err)
+	}
+	if _, err := service.SetSleep(context.Background(), "u", true); !errors.Is(err, ErrProfileRequired) {
+		t.Fatalf("expected ErrProfileRequired for sleep, got %v", err)
+	}
+}
+
+func TestSetSleepReturnsStoredState(t *testing.T) {
+	for _, state := range []bool{true, false} {
+		stored, err := NewService(&profileRepositoryStub{}).SetSleep(context.Background(), "u", state)
+		if err != nil || stored != state {
+			t.Fatalf("expected %v, got %v, %v", state, stored, err)
+		}
+	}
 }

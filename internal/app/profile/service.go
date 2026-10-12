@@ -19,6 +19,8 @@ const (
 var (
 	ErrProfileNotFound = errors.New("profile not found")
 	ErrUserNotFound    = errors.New("user not found")
+	// ErrProfileRequired means the operation needs an existing profile.
+	ErrProfileRequired = errors.New("profile must be created first")
 )
 
 // ValidationError reports the first invalid field of a request.
@@ -47,9 +49,19 @@ type UpdateCommand struct {
 	City   string
 }
 
+type PreferencesCommand struct {
+	UserID string
+	MinAge int
+	MaxAge int
+	Sex    string
+}
+
 type Service interface {
 	Get(ctx context.Context, userID string) (View, error)
 	Update(context.Context, UpdateCommand) (domain.Profile, error)
+	UpdatePreferences(context.Context, PreferencesCommand) (domain.Preferences, error)
+	// SetSleep returns the stored sleep state.
+	SetSleep(ctx context.Context, userID string, isSleeping bool) (bool, error)
 }
 
 type service struct {
@@ -94,6 +106,53 @@ func (s *service) Update(ctx context.Context, command UpdateCommand) (domain.Pro
 		return domain.Profile{}, fmt.Errorf("save profile: %w", err)
 	}
 	return saved, nil
+}
+
+func (s *service) UpdatePreferences(ctx context.Context, command PreferencesCommand) (domain.Preferences, error) {
+	preferences, err := validatePreferences(command)
+	if err != nil {
+		return domain.Preferences{}, err
+	}
+	saved, err := s.profiles.SavePreferences(ctx, preferences)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return domain.Preferences{}, ErrProfileRequired
+		}
+		return domain.Preferences{}, fmt.Errorf("save preferences: %w", err)
+	}
+	return saved, nil
+}
+
+func (s *service) SetSleep(ctx context.Context, userID string, isSleeping bool) (bool, error) {
+	stored, err := s.profiles.SetSleep(ctx, userID, isSleeping)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return false, ErrProfileRequired
+		}
+		return false, fmt.Errorf("set sleep mode: %w", err)
+	}
+	return stored, nil
+}
+
+func validatePreferences(command PreferencesCommand) (domain.Preferences, error) {
+	sex := domain.SearchSex(command.Sex)
+	ageRange := fmt.Sprintf("must be between %d and %d", domain.MinAge, domain.MaxAge)
+	switch {
+	case command.MinAge < domain.MinAge || command.MinAge > domain.MaxAge:
+		return domain.Preferences{}, &ValidationError{"min_age", ageRange}
+	case command.MaxAge < domain.MinAge || command.MaxAge > domain.MaxAge:
+		return domain.Preferences{}, &ValidationError{"max_age", ageRange}
+	case command.MinAge > command.MaxAge:
+		return domain.Preferences{}, &ValidationError{"min_age", "must not exceed max_age"}
+	case sex != domain.SearchSexMale && sex != domain.SearchSexFemale && sex != domain.SearchSexAny:
+		return domain.Preferences{}, &ValidationError{"sex", "must be male, female or any"}
+	}
+	return domain.Preferences{
+		UserID: command.UserID,
+		MinAge: int16(command.MinAge),
+		MaxAge: int16(command.MaxAge),
+		Sex:    sex,
+	}, nil
 }
 
 func validateUpdate(command UpdateCommand) (domain.Profile, error) {
