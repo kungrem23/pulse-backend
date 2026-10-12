@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	appauth "github.com/kungrem23/pulse-backend/internal/app/auth"
+	appprofile "github.com/kungrem23/pulse-backend/internal/app/profile"
 	"github.com/kungrem23/pulse-backend/internal/config"
 	"github.com/kungrem23/pulse-backend/internal/platform/database"
 	"github.com/kungrem23/pulse-backend/internal/repository/postgres"
@@ -56,6 +57,7 @@ func main() {
 				security.NewDefaultPasswordManager(),
 				tokens,
 			),
+			Profile: appprofile.NewService(postgres.NewProfileRepository(db)),
 		}),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		ReadTimeout:       cfg.ReadTimeout,

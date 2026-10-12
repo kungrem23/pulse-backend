@@ -15,6 +15,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	appauth "github.com/kungrem23/pulse-backend/internal/app/auth"
+	appprofile "github.com/kungrem23/pulse-backend/internal/app/profile"
 	"github.com/kungrem23/pulse-backend/internal/repository/postgres"
 	"github.com/kungrem23/pulse-backend/internal/security"
 	"github.com/kungrem23/pulse-backend/internal/testsupport/pgtest"
@@ -45,6 +46,11 @@ func (s *integrationServer) get(t *testing.T, path, accessToken string) *httptes
 	return s.request(t, http.MethodGet, path, "", accessToken)
 }
 
+func (s *integrationServer) put(t *testing.T, path, body, accessToken string) *httptest.ResponseRecorder {
+	t.Helper()
+	return s.request(t, http.MethodPut, path, body, accessToken)
+}
+
 func (s *integrationServer) do(t *testing.T, path, body, accessToken string) *httptest.ResponseRecorder {
 	t.Helper()
 	return s.request(t, http.MethodPost, path, body, accessToken)
@@ -66,6 +72,7 @@ func (s *integrationServer) request(t *testing.T, method, path, body, accessToke
 			passwords,
 			s.tokens,
 		),
+		Profile: appprofile.NewService(postgres.NewProfileRepository(s.pool)),
 	})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(method, path, strings.NewReader(body))

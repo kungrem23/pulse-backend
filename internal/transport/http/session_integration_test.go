@@ -112,7 +112,7 @@ func TestSessionLifecycleWithPostgres(t *testing.T) {
 	login = server.do(t, "/api/v1/auth/login", `{"email":"b@example.com","password":"password123"}`, "")
 	expect(login, http.StatusForbidden, "blocked login")
 	expect(server.get(t, "/api/v1/profile", foreign.AccessToken), http.StatusForbidden, "blocked user with a still valid access token")
-	expect(server.get(t, "/api/v1/profile", current.AccessToken), http.StatusNotImplemented, "active user passes authentication")
+	expect(server.get(t, "/api/v1/profile", current.AccessToken), http.StatusNotFound, "active user without a profile passes authentication")
 	expect(server.get(t, "/api/v1/profile", current.RefreshToken), http.StatusUnauthorized, "refresh token used as access")
 
 	if _, err := server.pool.Exec(context.Background(), "DELETE FROM users WHERE email = 'a@example.com'"); err != nil {

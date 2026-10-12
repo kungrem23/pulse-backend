@@ -74,7 +74,7 @@ func TestUserRoutesRequireUnblockedUser(t *testing.T) {
 			{"no token", "", http.StatusUnauthorized, "unauthorized"},
 			{"invalid token", "Bearer forged", http.StatusUnauthorized, "unauthorized"},
 			{"blocked user", "Bearer blocked", http.StatusForbidden, "forbidden"},
-			{"valid user", "Bearer valid", http.StatusNotImplemented, "not_implemented"},
+			{"valid user", "Bearer valid", 0, ""},
 		} {
 			t.Run(route.method+" "+route.path+"/"+test.name, func(t *testing.T) {
 				request := httptest.NewRequest(route.method, route.path, nil)
@@ -84,8 +84,12 @@ func TestUserRoutesRequireUnblockedUser(t *testing.T) {
 				res := httptest.NewRecorder()
 				router.ServeHTTP(res, request)
 				var body httpx.ErrorResponse
-				if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
-					t.Fatalf("decode response: %v", err)
+				_ = json.Unmarshal(res.Body.Bytes(), &body)
+				if test.wantStatus == 0 {
+					if res.Code == http.StatusUnauthorized || res.Code == http.StatusForbidden {
+						t.Fatalf("a valid user must pass authentication, got %d", res.Code)
+					}
+					return
 				}
 				if res.Code != test.wantStatus || body.Error.Code != test.wantCode {
 					t.Fatalf("expected %d %s, got %d %s", test.wantStatus, test.wantCode, res.Code, body.Error.Code)

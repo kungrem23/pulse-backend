@@ -1,9 +1,7 @@
 package auth
 
 import (
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 
 	"github.com/kungrem23/pulse-backend/internal/app/adminauth"
@@ -26,7 +24,7 @@ func NewHandler(service appauth.Service, adminService adminauth.Service) *Handle
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	var request registerRequest
-	if err := decodeJSON(r, &request); err != nil {
+	if err := httpx.DecodeJSON(r, &request); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
@@ -64,7 +62,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var request userLoginRequest
-	if err := decodeJSON(r, &request); err != nil {
+	if err := httpx.DecodeJSON(r, &request); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
@@ -94,7 +92,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
 	var request adminLoginRequest
-	if err := decodeJSON(r, &request); err != nil {
+	if err := httpx.DecodeJSON(r, &request); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
@@ -119,21 +117,6 @@ func (h *Handler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, adminSessionResponse(session))
 }
 
-const maxAuthRequestBytes = 16 << 10
-
-func decodeJSON(r *http.Request, destination any) error {
-	decoder := json.NewDecoder(io.LimitReader(r.Body, maxAuthRequestBytes))
-	decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(destination); err != nil {
-		return err
-	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		return errors.New("request body must contain a single JSON value")
-	}
-	return nil
-}
-
 func userSessionResponse(session appauth.Session) sessionResponse {
 	return sessionResponse{
 		AccessToken:      session.AccessToken,
@@ -146,7 +129,7 @@ func userSessionResponse(session appauth.Session) sessionResponse {
 
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	var request refreshRequest
-	if err := decodeJSON(r, &request); err != nil || request.RefreshToken == "" {
+	if err := httpx.DecodeJSON(r, &request); err != nil || request.RefreshToken == "" {
 		httpx.Error(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
@@ -176,7 +159,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var request refreshRequest
-	if err := decodeJSON(r, &request); err != nil || request.RefreshToken == "" {
+	if err := httpx.DecodeJSON(r, &request); err != nil || request.RefreshToken == "" {
 		httpx.Error(w, http.StatusBadRequest, "invalid request body")
 		return
 	}

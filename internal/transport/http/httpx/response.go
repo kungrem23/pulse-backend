@@ -2,8 +2,27 @@ package httpx
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 )
+
+// MaxJSONBodyBytes bounds JSON request bodies; larger bodies fail to decode.
+const MaxJSONBodyBytes = 16 << 10
+
+// DecodeJSON reads exactly one JSON value and rejects unknown fields.
+func DecodeJSON(r *http.Request, destination any) error {
+	decoder := json.NewDecoder(io.LimitReader(r.Body, MaxJSONBodyBytes))
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(destination); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return errors.New("request body must contain a single JSON value")
+	}
+	return nil
+}
 
 type APIError struct {
 	Code    string            `json:"code"`
@@ -45,6 +64,14 @@ func Error(w http.ResponseWriter, status int, message string) {
 
 func ErrorCode(w http.ResponseWriter, status int, code, message string) {
 	WriteJSON(w, status, ErrorResponse{Error: APIError{Code: code, Message: message}})
+}
+
+func ValidationFailed(w http.ResponseWriter, field, message string) {
+	WriteJSON(w, http.StatusUnprocessableEntity, ErrorResponse{Error: APIError{
+		Code:    "validation_failed",
+		Message: field + " " + message,
+		Details: map[string]string{field: message},
+	}})
 }
 
 func NotImplemented(operation string) http.HandlerFunc {

@@ -25,10 +25,14 @@ type RefreshSessionRepository interface {
 }
 
 type ProfileRepository interface {
-	// Upsert updates users.age and the profile/preferences in one transaction.
-	Upsert(context.Context, Profile, Preferences) error
+	// Save creates or replaces the profile and sets users.age in one transaction.
+	// IsSleeping is ignored on input: an existing profile keeps its state, a new
+	// one starts awake. Returns ErrNotFound if the user does not exist.
+	Save(context.Context, Profile) (Profile, error)
+	// ByUserID returns the profile with Age read from users.age.
 	ByUserID(context.Context, string) (Profile, error)
-	Feed(context.Context, string, PageRequest) (Page[Profile], error)
+	// Preferences returns ErrNotFound until the user has set them.
+	Preferences(context.Context, string) (Preferences, error)
 }
 
 type SwipeRepository interface {

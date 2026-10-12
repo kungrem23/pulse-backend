@@ -243,14 +243,12 @@ paths:
       tags: [Profile]
       operationId: getOwnProfile
       x-release: mvp
-      x-implementation-status: placeholder
+      x-implementation-status: partial
       summary: Get the current user's profile
       x-required-principal: user
       security:
         - bearerAuth: []
       responses:
-        "501":
-          $ref: "#/components/responses/NotImplemented"
         "200":
           description: Profile, preferences, and photos
           content:
@@ -262,13 +260,21 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
-          $ref: "#/components/responses/NotFound"
+          description: The user has not created a profile yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     put:
       tags: [Profile]
       operationId: putOwnProfile
       x-release: mvp
-      x-implementation-status: placeholder
+      x-implementation-status: partial
       summary: Create or replace the current user's profile
+      description: |
+        Sets users.age and the profile in one transaction. Text fields are trimmed;
+        lengths are counted in Unicode characters. Omitted bio becomes empty.
+        Sleep mode is not changed by this operation.
       x-required-principal: user
       security:
         - bearerAuth: []
@@ -279,8 +285,6 @@ paths:
             schema:
               $ref: "#/components/schemas/PutProfileRequest"
       responses:
-        "501":
-          $ref: "#/components/responses/NotImplemented"
         "200":
           description: Profile saved
           content:
@@ -1324,7 +1328,10 @@ components:
         profile:
           $ref: "#/components/schemas/Profile"
         preferences:
-          $ref: "#/components/schemas/Preferences"
+          description: Null until the user sets preferences; no defaults are invented.
+          anyOf:
+            - $ref: "#/components/schemas/Preferences"
+            - type: "null"
         photos:
           type: array
           maxItems: 5
