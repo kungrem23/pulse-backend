@@ -481,13 +481,17 @@ paths:
       tags: [Matching]
       operationId: createSwipe
       x-release: mvp
-      x-implementation-status: placeholder
+      x-implementation-status: partial
       summary: Like or dislike a user
       description: |
         Saving the swipe and creating a mutual match are atomic, including checks
         of both profiles and mutual preferences. An existing outgoing swipe or
         active/closed match pair returns 409 without rewriting swipe history.
-        An unavailable candidate returns 404; a self-swipe returns 422.
+        An unavailable candidate returns 404; a self-swipe or a to_user_id that
+        is not a UUID returns 422. A missing or non-boolean is_like returns 400.
+        403 means the caller cannot take part in discovery: blocked, incomplete
+        profile or preferences, no photos, or sleep mode.
+        Returns 501 until the swipe repository is wired in the server.
       x-required-principal: user
       security:
         - bearerAuth: []
@@ -518,19 +522,27 @@ paths:
           $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/ValidationFailed"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /api/v1/matches:
     get:
       tags: [Matching]
       operationId: listMatches
       x-release: mvp
-      x-implementation-status: placeholder
+      x-implementation-status: partial
       summary: List the current user's matches
       description: |
         Returns only the caller's matches, including closed pairs. Sleeping or
         incomplete profiles may still read their existing matches.
         Pagination order is matches.created_at descending, then matches.id descending.
         Cursors belong to this list and the authenticated user.
+        user.photo_url is the partner's photo with the lowest position, omitted
+        when the partner has no photos; it is a temporary link.
+        An empty, repeated or foreign cursor and an explicit limit outside
+        1-100 (including 0) or not a plain integer return 400. 403 is returned
+        only for a blocked caller.
+        Returns 501 until the match repository is wired in the server.
       x-required-principal: user
       security:
         - bearerAuth: []
@@ -552,6 +564,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /api/v1/matches/{match_id}:
     parameters:
