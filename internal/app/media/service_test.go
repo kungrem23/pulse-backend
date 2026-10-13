@@ -48,6 +48,10 @@ func (s *photoRepositoryStub) ByIDForUser(_ context.Context, photoID, userID str
 	return s.owned, s.ownedErr
 }
 
+func (s *photoRepositoryStub) ByUserID(context.Context, string) ([]domain.Photo, error) {
+	return nil, errors.New("unexpected photo list call in upload/delete test")
+}
+
 func (s *photoRepositoryStub) Delete(_ context.Context, photoID, userID string) error {
 	s.deleteCalls++
 	s.deletePhotoID = photoID

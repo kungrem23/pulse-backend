@@ -452,6 +452,8 @@ paths:
         self, sleeping or blocked users, previously swiped users, and every
         existing match pair including closed pairs. Returns an empty items
         array when exhausted; MVP does not reset swipe history.
+        Pagination order is users.created_at descending, then users.id descending.
+        Cursors belong to this list and the authenticated user.
       x-required-principal: user
       security:
         - bearerAuth: []
@@ -481,7 +483,11 @@ paths:
       x-release: mvp
       x-implementation-status: placeholder
       summary: Like or dislike a user
-      description: Saving the swipe and creating a mutual match are atomic.
+      description: |
+        Saving the swipe and creating a mutual match are atomic, including checks
+        of both profiles and mutual preferences. An existing outgoing swipe or
+        active/closed match pair returns 409 without rewriting swipe history.
+        An unavailable candidate returns 404; a self-swipe returns 422.
       x-required-principal: user
       security:
         - bearerAuth: []
@@ -520,6 +526,11 @@ paths:
       x-release: mvp
       x-implementation-status: placeholder
       summary: List the current user's matches
+      description: |
+        Returns only the caller's matches, including closed pairs. Sleeping or
+        incomplete profiles may still read their existing matches.
+        Pagination order is matches.created_at descending, then matches.id descending.
+        Cursors belong to this list and the authenticated user.
       x-required-principal: user
       security:
         - bearerAuth: []

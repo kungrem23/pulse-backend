@@ -46,12 +46,52 @@ type ProfileRepository interface {
 type PhotoRepository interface {
 	Create(context.Context, Photo) error
 	ByIDForUser(context.Context, string, string) (Photo, error)
+	// ByUserID lists only this user's photos ordered by position ASC.
+	// No photos is an empty slice, not ErrNotFound. Keys remain internal;
+	// application services obtain fresh URLs through PhotoStorage.
+	ByUserID(ctx context.Context, userID string) ([]Photo, error)
 	Delete(context.Context, string, string) error
 }
 
+// SearchStateRepository supplies the common eligibility precheck for feed/swipe.
+// An existing user without a profile/preferences/photos gets a partial state;
+// only a missing user returns ErrNotFound. A precheck is not a write-time lock.
+type SearchStateRepository interface {
+	StateByUserID(ctx context.Context, userID string) (SearchState, error)
+}
+
+type DiscoveryRepository interface {
+	// Feed applies mutual age/sex preferences, with no city filter, and excludes
+	// self, ineligible users, outgoing swipes, and all active/closed match pairs.
+	// Order: users.created_at DESC, users.id DESC; After is an exclusive boundary.
+	// Return at most Limit candidates and HasMore using one-row lookahead.
+	// Photos are included in position ASC order, without per-candidate queries.
+	// Recheck the caller's eligibility while reading; return CheckEligible's
+	// error, or ErrNotFound if the caller no longer exists.
+	Feed(ctx context.Context, userID string, page PageQuery) (PageResult[DiscoveryCandidate], error)
+}
+
 type SwipeRepository interface {
-	// Save atomically stores a swipe and a unique match. Closed pairs cannot rematch.
-	Save(context.Context, string, string, bool) (*Match, error)
+	// Save serializes the canonical UUID pair and atomically stores the swipe
+	// and, for mutual likes, exactly one match. It rechecks both users' state,
+	// mutual preferences, outgoing swipe history and any existing match inside
+	// the transaction; an earlier app-layer precheck cannot replace this.
+	// Existing outgoing swipe or active/closed pair returns ErrConflict without
+	// rewriting history. Missing/ineligible/nonmatching target returns
+	// ErrCandidateUnavailable; an ineligible caller gets CheckEligible's error,
+	// a missing caller ErrNotFound, and a self-swipe ErrSelfSwipe.
+	// Return nil for no match, or the created match; never create a conversation.
+	Save(ctx context.Context, fromUserID, toUserID string, isLike bool) (*Match, error)
+}
+
+type MatchRepository interface {
+	// ListByUserID returns only this user's matches, including closed ones,
+	// ordered by matches.created_at DESC, matches.id DESC. After is exclusive.
+	// Each result includes the other user's profile and optional first photo
+	// (lowest position); do not apply discovery eligibility to existing matches.
+	// Return at most Limit entries and HasMore using one-row lookahead.
+	// Partner data is loaded in bulk, never by querying once per match.
+	ListByUserID(ctx context.Context, userID string, page PageQuery) (PageResult[MatchWithPartner], error)
 }
 
 type MessageRepository interface {
