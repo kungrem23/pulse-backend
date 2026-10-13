@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"errors"
+	"hash/crc32"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -73,6 +75,7 @@ type photoStorageStub struct {
 	deleteCalls      int
 	deletedObjectKey string
 	deleteErr        error
+	deleteCtxErr     error
 }
 
 func (s *photoStorageStub) Put(_ context.Context, key string, content []byte, contentType string) (string, error) {
@@ -86,9 +89,10 @@ func (s *photoStorageStub) Put(_ context.Context, key string, content []byte, co
 	return s.putResult, s.putErr
 }
 
-func (s *photoStorageStub) Delete(_ context.Context, key string) error {
+func (s *photoStorageStub) Delete(ctx context.Context, key string) error {
 	s.deleteCalls++
 	s.deletedObjectKey = key
+	s.deleteCtxErr = ctx.Err()
 	return s.deleteErr
 }
 
@@ -212,8 +216,62 @@ func TestUploadReportsCompensationFailure(t *testing.T) {
 	_, err := service.Upload(context.Background(), UploadCommand{
 		UserID: testUserID, Content: encodeImage(t, "png"), Position: 1,
 	})
-	if !errors.Is(err, createErr) || !errors.Is(err, cleanupErr) {
+	if !errors.Is(err, createErr) || !errors.Is(err, cleanupErr) || !errors.Is(err, ErrCleanupFailed) {
 		t.Fatalf("expected both failures, got %v", err)
+	}
+}
+
+func TestUploadRequiresProfileAndCompensatesAfterCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	repository := &photoRepositoryStub{createErr: domain.ErrNotFound}
+	storage := &photoStorageStub{}
+	service := newService(repository, storage, func() string { return testPhotoID })
+	_, err := service.Upload(ctx, UploadCommand{UserID: testUserID, Content: encodeImage(t, "png"), Position: 1})
+	if !errors.Is(err, ErrProfileRequired) || storage.deleteCalls != 1 || storage.deleteCtxErr != nil {
+		t.Fatalf("missing profile must trigger cleanup independent of request cancellation: %v, %+v", err, storage)
+	}
+}
+
+func TestUploadRejectsTruncatedAndOversizedDimensions(t *testing.T) {
+	for _, format := range []string{"png", "jpeg", "webp"} {
+		t.Run(format, func(t *testing.T) {
+			var content []byte
+			if format == "webp" {
+				content = decodeWebP(t)
+			} else {
+				content = encodeImage(t, format)
+			}
+			content = content[:len(content)-10]
+			if _, _, err := image.DecodeConfig(bytes.NewReader(content)); err != nil {
+				t.Fatalf("fixture must have a valid header to exercise full decoding: %v", err)
+			}
+			storage := &photoStorageStub{}
+			service := newService(&photoRepositoryStub{}, storage, func() string { return testPhotoID })
+			_, err := service.Upload(context.Background(), UploadCommand{UserID: testUserID, Content: content, Position: 1})
+			if !errors.Is(err, ErrUnsupportedPhoto) || storage.putCalls != 0 {
+				t.Fatalf("truncated %s reached storage: %v", format, err)
+			}
+		})
+	}
+	content := encodeImage(t, "png")
+	binary.BigEndian.PutUint32(content[16:20], MaxDecodedPhotoPixels+1)
+	binary.BigEndian.PutUint32(content[20:24], 1)
+	binary.BigEndian.PutUint32(content[29:33], crc32.ChecksumIEEE(content[12:29]))
+	if _, _, err := image.DecodeConfig(bytes.NewReader(content)); err != nil {
+		t.Fatalf("large-dimension fixture must have a valid PNG header: %v", err)
+	}
+	if _, err := inspectImage(content); !errors.Is(err, ErrUnsupportedPhoto) {
+		t.Fatalf("huge decoded dimensions must be rejected before allocation: %v", err)
+	}
+}
+
+func TestUploadAcceptsExactFileSizeLimit(t *testing.T) {
+	content := encodeImage(t, "png")
+	content = append(content, make([]byte, domain.MaxPhotoBytes-len(content))...)
+	service := newService(&photoRepositoryStub{}, &photoStorageStub{}, func() string { return testPhotoID })
+	if _, err := service.Upload(context.Background(), UploadCommand{UserID: testUserID, Content: content, Position: 5}); err != nil {
+		t.Fatalf("valid image at exactly 10 MiB must be accepted: %v", err)
 	}
 }
 
@@ -281,6 +339,10 @@ func TestDeleteCanRetryAfterMetadataFailure(t *testing.T) {
 	}
 	if storage.deleteCalls != 1 || repository.deleteCalls != 1 {
 		t.Fatal("expected storage delete followed by metadata delete")
+	}
+	repository.deleteErr = nil
+	if err := service.Delete(context.Background(), testUserID, testPhotoID); err != nil || storage.deleteCalls != 2 || repository.deleteCalls != 2 {
+		t.Fatalf("retry must repair a metadata deletion failure: %v", err)
 	}
 }
 

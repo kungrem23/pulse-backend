@@ -6,8 +6,73 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kungrem23/pulse-backend/internal/app/media"
 	"github.com/kungrem23/pulse-backend/internal/domain"
 )
+
+type photoRepositoryStub struct {
+	domain.PhotoRepository
+	photos []domain.Photo
+	err    error
+	userID string
+}
+
+func (s *photoRepositoryStub) ByUserID(_ context.Context, userID string) ([]domain.Photo, error) {
+	s.userID = userID
+	return s.photos, s.err
+}
+
+type photoStorageStub struct {
+	domain.PhotoStorage
+	keys []string
+	err  error
+}
+
+func (s *photoStorageStub) URL(_ context.Context, key string) (string, error) {
+	s.keys = append(s.keys, key)
+	return "https://photos.example.test/fresh-url", s.err
+}
+
+func newTestService(profiles domain.ProfileRepository) Service {
+	return NewService(profiles, &photoRepositoryStub{}, &photoStorageStub{})
+}
+
+func TestGetPhotoURLsAndFailures(t *testing.T) {
+	profiles := &profileRepositoryStub{profile: domain.Profile{UserID: "owner", Name: "Анна"}}
+	photos := &photoRepositoryStub{photos: []domain.Photo{
+		{ID: "p1", UserID: "owner", ObjectKey: "private/first", Position: 1},
+		{ID: "p3", UserID: "owner", ObjectKey: "private/third", Position: 3},
+	}}
+	storage := &photoStorageStub{}
+	service := NewService(profiles, photos, storage)
+	view, err := service.Get(context.Background(), "owner")
+	if err != nil || photos.userID != "owner" || len(view.Photos) != 2 ||
+		view.Photos[0] != (media.Photo{ID: "p1", URL: "https://photos.example.test/fresh-url", Position: 1}) ||
+		view.Photos[1].Position != 3 {
+		t.Fatalf("unexpected photo view: %+v, %v", view, err)
+	}
+	if len(storage.keys) != 2 || storage.keys[0] != "private/first" || storage.keys[1] != "private/third" {
+		t.Fatalf("unexpected signing keys: %+v", storage.keys)
+	}
+	if _, err := service.Get(context.Background(), "owner"); err != nil || len(storage.keys) != 4 {
+		t.Fatalf("URLs must be signed on every read: %v", err)
+	}
+	photos.err = errors.New("database unavailable")
+	if _, err := service.Get(context.Background(), "owner"); !errors.Is(err, photos.err) {
+		t.Fatalf("expected photo repository error, got %v", err)
+	}
+	photos.err = nil
+	storage.err = errors.New("storage unavailable")
+	if _, err := service.Get(context.Background(), "owner"); !errors.Is(err, storage.err) {
+		t.Fatalf("expected URL error, got %v", err)
+	}
+	storage.err = nil
+	photos.photos = nil
+	view, err = service.Get(context.Background(), "owner")
+	if err != nil || view.Photos == nil || len(view.Photos) != 0 || view.Profile.Name != "Анна" {
+		t.Fatalf("deleting last photo must retain profile and empty array: %+v, %v", view, err)
+	}
+}
 
 type profileRepositoryStub struct {
 	profile        domain.Profile
@@ -57,7 +122,7 @@ func TestUpdateNormalizesAndSaves(t *testing.T) {
 	command := validCommand()
 	command.Name, command.City, command.Bio = "  Анна ", "\tМосква\n", "  "
 
-	profile, err := NewService(repository).Update(context.Background(), command)
+	profile, err := newTestService(repository).Update(context.Background(), command)
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}
@@ -82,7 +147,7 @@ func TestUpdateAcceptsBoundaries(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			command := validCommand()
 			mutate(&command)
-			if _, err := NewService(&profileRepositoryStub{}).Update(context.Background(), command); err != nil {
+			if _, err := newTestService(&profileRepositoryStub{}).Update(context.Background(), command); err != nil {
 				t.Fatalf("expected success, got %v", err)
 			}
 		})
@@ -115,7 +180,7 @@ func TestUpdateRejectsInvalidFieldsBeforeSaving(t *testing.T) {
 			command := validCommand()
 			test.mutate(&command)
 
-			_, err := NewService(repository).Update(context.Background(), command)
+			_, err := newTestService(repository).Update(context.Background(), command)
 			var validation *ValidationError
 			if !errors.As(err, &validation) || validation.Field != test.field {
 				t.Fatalf("expected validation error for %s, got %v", test.field, err)
@@ -128,7 +193,7 @@ func TestUpdateRejectsInvalidFieldsBeforeSaving(t *testing.T) {
 }
 
 func TestUpdateMapsMissingUser(t *testing.T) {
-	_, err := NewService(&profileRepositoryStub{saveErr: domain.ErrNotFound}).Update(context.Background(), validCommand())
+	_, err := newTestService(&profileRepositoryStub{saveErr: domain.ErrNotFound}).Update(context.Background(), validCommand())
 	if !errors.Is(err, ErrUserNotFound) {
 		t.Fatalf("expected ErrUserNotFound, got %v", err)
 	}
@@ -138,26 +203,26 @@ func TestGet(t *testing.T) {
 	profile := domain.Profile{UserID: "user-1", Name: "Анна", Age: 25, Sex: domain.SexFemale, City: "Москва"}
 
 	t.Run("no profile yet", func(t *testing.T) {
-		_, err := NewService(&profileRepositoryStub{profileErr: domain.ErrNotFound}).Get(context.Background(), "user-1")
+		_, err := newTestService(&profileRepositoryStub{profileErr: domain.ErrNotFound}).Get(context.Background(), "user-1")
 		if !errors.Is(err, ErrProfileNotFound) {
 			t.Fatalf("expected ErrProfileNotFound, got %v", err)
 		}
 	})
 	t.Run("no preferences yet", func(t *testing.T) {
-		view, err := NewService(&profileRepositoryStub{profile: profile, preferencesErr: domain.ErrNotFound}).Get(context.Background(), "user-1")
+		view, err := newTestService(&profileRepositoryStub{profile: profile, preferencesErr: domain.ErrNotFound}).Get(context.Background(), "user-1")
 		if err != nil || view.Profile != profile || view.Preferences != nil || view.Photos == nil {
 			t.Fatalf("unexpected view %+v, %v", view, err)
 		}
 	})
 	t.Run("with preferences", func(t *testing.T) {
 		preferences := domain.Preferences{UserID: "user-1", MinAge: 20, MaxAge: 30, Sex: domain.SearchSexAny}
-		view, err := NewService(&profileRepositoryStub{profile: profile, preferences: preferences}).Get(context.Background(), "user-1")
+		view, err := newTestService(&profileRepositoryStub{profile: profile, preferences: preferences}).Get(context.Background(), "user-1")
 		if err != nil || view.Preferences == nil || *view.Preferences != preferences {
 			t.Fatalf("unexpected view %+v, %v", view, err)
 		}
 	})
 	t.Run("storage failure", func(t *testing.T) {
-		_, err := NewService(&profileRepositoryStub{profile: profile, preferencesErr: errors.New("down")}).Get(context.Background(), "user-1")
+		_, err := newTestService(&profileRepositoryStub{profile: profile, preferencesErr: errors.New("down")}).Get(context.Background(), "user-1")
 		if err == nil || errors.Is(err, ErrProfileNotFound) {
 			t.Fatalf("expected an internal error, got %v", err)
 		}
@@ -167,7 +232,7 @@ func TestGet(t *testing.T) {
 func TestUpdatePreferences(t *testing.T) {
 	valid := PreferencesCommand{UserID: "user-1", MinAge: 18, MaxAge: 120, Sex: "any"}
 	repository := &profileRepositoryStub{}
-	saved, err := NewService(repository).UpdatePreferences(context.Background(), valid)
+	saved, err := newTestService(repository).UpdatePreferences(context.Background(), valid)
 	want := domain.Preferences{UserID: "user-1", MinAge: 18, MaxAge: 120, Sex: domain.SearchSexAny}
 	if err != nil || saved != want || len(repository.savedPreferences) != 1 {
 		t.Fatalf("unexpected result %+v, %v", saved, err)
@@ -177,7 +242,7 @@ func TestUpdatePreferences(t *testing.T) {
 		{UserID: "u", MinAge: 25, MaxAge: 25, Sex: "male"},
 		{UserID: "u", MinAge: 30, MaxAge: 40, Sex: "female"},
 	} {
-		if _, err := NewService(&profileRepositoryStub{}).UpdatePreferences(context.Background(), ok); err != nil {
+		if _, err := newTestService(&profileRepositoryStub{}).UpdatePreferences(context.Background(), ok); err != nil {
 			t.Fatalf("%+v must be accepted, got %v", ok, err)
 		}
 	}
@@ -199,7 +264,7 @@ func TestUpdatePreferences(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			repository := &profileRepositoryStub{}
-			_, err := NewService(repository).UpdatePreferences(context.Background(), test.command)
+			_, err := newTestService(repository).UpdatePreferences(context.Background(), test.command)
 			var validation *ValidationError
 			if !errors.As(err, &validation) || validation.Field != test.field {
 				t.Fatalf("expected validation error for %s, got %v", test.field, err)
@@ -212,7 +277,7 @@ func TestUpdatePreferences(t *testing.T) {
 }
 
 func TestPreferencesAndSleepRequireProfile(t *testing.T) {
-	service := NewService(&profileRepositoryStub{saveErr: domain.ErrNotFound})
+	service := newTestService(&profileRepositoryStub{saveErr: domain.ErrNotFound})
 	_, err := service.UpdatePreferences(context.Background(), PreferencesCommand{UserID: "u", MinAge: 18, MaxAge: 30, Sex: "any"})
 	if !errors.Is(err, ErrProfileRequired) {
 		t.Fatalf("expected ErrProfileRequired for preferences, got %v", err)
@@ -224,7 +289,7 @@ func TestPreferencesAndSleepRequireProfile(t *testing.T) {
 
 func TestSetSleepReturnsStoredState(t *testing.T) {
 	for _, state := range []bool{true, false} {
-		stored, err := NewService(&profileRepositoryStub{}).SetSleep(context.Background(), "u", state)
+		stored, err := newTestService(&profileRepositoryStub{}).SetSleep(context.Background(), "u", state)
 		if err != nil || stored != state {
 			t.Fatalf("expected %v, got %v, %v", state, stored, err)
 		}

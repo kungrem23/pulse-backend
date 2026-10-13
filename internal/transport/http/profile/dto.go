@@ -87,5 +87,8 @@ func newViewResponse(view appprofile.View) viewResponse {
 	if view.Preferences != nil {
 		response.Preferences = newPreferencesResponse(*view.Preferences)
 	}
+	for _, photo := range view.Photos {
+		response.Photos = append(response.Photos, photoResponse{ID: photo.ID, URL: photo.URL, Position: photo.Position})
+	}
 	return response
 }

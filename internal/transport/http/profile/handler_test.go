@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kungrem23/pulse-backend/internal/app/media"
 	appprofile "github.com/kungrem23/pulse-backend/internal/app/profile"
 	"github.com/kungrem23/pulse-backend/internal/domain"
 	"github.com/kungrem23/pulse-backend/internal/transport/http/middleware"
@@ -91,6 +92,19 @@ func TestGetWithPreferences(t *testing.T) {
 	response := serve(service, http.MethodGet, "")
 	if !strings.Contains(response.Body.String(), `"preferences":{"user_id":"u","min_age":20,"max_age":30,"sex":"any"}`) {
 		t.Fatalf("unexpected response: %s", response.Body)
+	}
+}
+
+func TestGetIncludesPublicPhotos(t *testing.T) {
+	service := &serviceStub{view: appprofile.View{
+		Profile: domain.Profile{UserID: "u", Name: "Анна", Age: 25},
+		Photos:  []media.Photo{{ID: "photo-id", URL: "https://photos.example.test/signed", Position: 2}},
+	}}
+	response := serve(service, http.MethodGet, "")
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(),
+		`"photos":[{"id":"photo-id","url":"https://photos.example.test/signed","position":2}]`) ||
+		strings.Contains(response.Body.String(), "object_key") {
+		t.Fatalf("unexpected photo response: %d %s", response.Code, response.Body)
 	}
 }
 

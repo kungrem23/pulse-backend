@@ -15,15 +15,18 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	appauth "github.com/kungrem23/pulse-backend/internal/app/auth"
+	appmedia "github.com/kungrem23/pulse-backend/internal/app/media"
 	appprofile "github.com/kungrem23/pulse-backend/internal/app/profile"
+	"github.com/kungrem23/pulse-backend/internal/domain"
 	"github.com/kungrem23/pulse-backend/internal/repository/postgres"
 	"github.com/kungrem23/pulse-backend/internal/security"
 	"github.com/kungrem23/pulse-backend/internal/testsupport/pgtest"
 )
 
 type integrationServer struct {
-	pool   *pgxpool.Pool
-	tokens *security.TokenIssuer
+	pool    *pgxpool.Pool
+	tokens  *security.TokenIssuer
+	storage domain.PhotoStorage
 }
 
 func newIntegrationServer(t *testing.T) *integrationServer {
@@ -64,11 +67,24 @@ func (s *integrationServer) do(t *testing.T, path, body, accessToken string) *ht
 // request builds a new router per request to simulate a server restart: all state lives in PostgreSQL.
 func (s *integrationServer) request(t *testing.T, method, path, body, accessToken string) *httptest.ResponseRecorder {
 	t.Helper()
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(method, path, strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	if accessToken != "" {
+		request.Header.Set("Authorization", "Bearer "+accessToken)
+	}
+	s.router(t).ServeHTTP(response, request)
+	return response
+}
+
+func (s *integrationServer) router(t *testing.T) http.Handler {
+	t.Helper()
 	passwords, err := security.NewPasswordManager(bcrypt.MinCost)
 	if err != nil {
 		t.Fatal(err)
 	}
-	router := NewRouter(Dependencies{
+	photos := postgres.NewPhotoRepository(s.pool)
+	return NewRouter(Dependencies{
 		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Database: s.pool,
 		Auth: appauth.NewService(
@@ -77,16 +93,9 @@ func (s *integrationServer) request(t *testing.T, method, path, body, accessToke
 			passwords,
 			s.tokens,
 		),
-		Profile: appprofile.NewService(postgres.NewProfileRepository(s.pool)),
+		Profile: appprofile.NewService(postgres.NewProfileRepository(s.pool), photos, s.storage),
+		Media:   appmedia.NewService(photos, s.storage),
 	})
-	response := httptest.NewRecorder()
-	request := httptest.NewRequest(method, path, strings.NewReader(body))
-	request.Header.Set("Content-Type", "application/json")
-	if accessToken != "" {
-		request.Header.Set("Authorization", "Bearer "+accessToken)
-	}
-	router.ServeHTTP(response, request)
-	return response
 }
 
 func TestAuthHTTPWithPostgres(t *testing.T) {

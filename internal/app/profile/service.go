@@ -8,6 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/kungrem23/pulse-backend/internal/app/media"
 	"github.com/kungrem23/pulse-backend/internal/domain"
 )
 
@@ -37,7 +38,7 @@ type View struct {
 	Profile domain.Profile
 	// Preferences is nil until the user sets them; no defaults are invented.
 	Preferences *domain.Preferences
-	Photos      []domain.Photo
+	Photos      []media.Photo
 }
 
 type UpdateCommand struct {
@@ -66,10 +67,12 @@ type Service interface {
 
 type service struct {
 	profiles domain.ProfileRepository
+	photos   domain.PhotoRepository
+	storage  domain.PhotoStorage
 }
 
-func NewService(profiles domain.ProfileRepository) Service {
-	return &service{profiles: profiles}
+func NewService(profiles domain.ProfileRepository, photos domain.PhotoRepository, storage domain.PhotoStorage) Service {
+	return &service{profiles: profiles, photos: photos, storage: storage}
 }
 
 func (s *service) Get(ctx context.Context, userID string) (View, error) {
@@ -81,14 +84,24 @@ func (s *service) Get(ctx context.Context, userID string) (View, error) {
 		return View{}, fmt.Errorf("get profile: %w", err)
 	}
 
-	// Photos are not listed until photo storage is wired.
-	view := View{Profile: profile, Photos: []domain.Photo{}}
+	view := View{Profile: profile, Photos: []media.Photo{}}
 	preferences, err := s.profiles.Preferences(ctx, userID)
 	switch {
 	case err == nil:
 		view.Preferences = &preferences
 	case !errors.Is(err, domain.ErrNotFound):
 		return View{}, fmt.Errorf("get preferences: %w", err)
+	}
+	photos, err := s.photos.ByUserID(ctx, userID)
+	if err != nil {
+		return View{}, fmt.Errorf("get profile photos: %w", err)
+	}
+	for _, photo := range photos {
+		url, err := s.storage.URL(ctx, photo.ObjectKey)
+		if err != nil {
+			return View{}, fmt.Errorf("get profile photo URL: %w", err)
+		}
+		view.Photos = append(view.Photos, media.Photo{ID: photo.ID, URL: url, Position: photo.Position})
 	}
 	return view, nil
 }

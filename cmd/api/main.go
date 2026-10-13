@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	appauth "github.com/kungrem23/pulse-backend/internal/app/auth"
+	appmedia "github.com/kungrem23/pulse-backend/internal/app/media"
 	appprofile "github.com/kungrem23/pulse-backend/internal/app/profile"
 	"github.com/kungrem23/pulse-backend/internal/config"
 	"github.com/kungrem23/pulse-backend/internal/platform/database"
@@ -62,6 +63,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	photos := postgres.NewPhotoRepository(db)
 	server := &http.Server{
 		Addr: cfg.HTTPAddr,
 		Handler: httpapi.NewRouter(httpapi.Dependencies{
@@ -74,7 +76,8 @@ func main() {
 				tokens,
 			),
 			PhotoStore: photoStore,
-			Profile:    appprofile.NewService(postgres.NewProfileRepository(db)),
+			Profile:    appprofile.NewService(postgres.NewProfileRepository(db), photos, photoStore),
+			Media:      appmedia.NewService(photos, photoStore),
 		}),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		ReadTimeout:       cfg.ReadTimeout,

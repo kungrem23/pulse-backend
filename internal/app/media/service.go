@@ -16,6 +16,8 @@ var (
 	ErrUnsupportedPhoto = errors.New("photo must contain a valid JPEG, PNG, or WebP image")
 	ErrPositionOccupied = errors.New("photo position is occupied")
 	ErrPhotoNotFound    = errors.New("photo not found")
+	ErrProfileRequired  = errors.New("profile must be created before uploading photos")
+	ErrCleanupFailed    = errors.New("photo object cleanup failed")
 )
 
 type UploadCommand struct {

@@ -48,6 +48,8 @@ func (s *service) Upload(ctx context.Context, command UploadCommand) (Photo, err
 		cause := fmt.Errorf("create photo metadata: %w", err)
 		if errors.Is(err, domain.ErrConflict) {
 			cause = ErrPositionOccupied
+		} else if errors.Is(err, domain.ErrNotFound) {
+			cause = ErrProfileRequired
 		}
 		return Photo{}, s.compensate(ctx, storedKey, cause)
 	}
@@ -59,7 +61,7 @@ func (s *service) compensate(ctx context.Context, objectKey string, cause error)
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), compensationTimeout)
 	defer cancel()
 	if err := s.storage.Delete(cleanupCtx, objectKey); err != nil {
-		return errors.Join(cause, fmt.Errorf("compensate photo object: %w", err))
+		return errors.Join(cause, ErrCleanupFailed, fmt.Errorf("compensate photo object: %w", err))
 	}
 	return cause
 }

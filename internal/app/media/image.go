@@ -16,6 +16,10 @@ type imageFormat struct {
 	extension   string
 }
 
+// MaxDecodedPhotoPixels bounds memory used by full image validation. A small
+// compressed file can otherwise request gigabytes of image buffers.
+const MaxDecodedPhotoPixels = 25_000_000
+
 func inspectImage(content []byte) (imageFormat, error) {
 	if len(content) > domain.MaxPhotoBytes {
 		return imageFormat{}, ErrPhotoTooLarge
@@ -51,7 +55,18 @@ func inspectImage(content []byte) (imageFormat, error) {
 	default:
 		return imageFormat{}, ErrUnsupportedPhoto
 	}
-	if width <= 0 || height <= 0 {
+	if width <= 0 || height <= 0 || width > MaxDecodedPhotoPixels/height {
+		return imageFormat{}, ErrUnsupportedPhoto
+	}
+
+	// DecodeConfig alone accepts truncated images with valid headers. Validate
+	// the complete image only after bounding the decompressed dimensions.
+	decoded, format, err := image.Decode(bytes.NewReader(content))
+	if err != nil || decoded == nil {
+		return imageFormat{}, ErrUnsupportedPhoto
+	}
+	wantFormat := map[string]string{"image/jpeg": "jpeg", "image/png": "png", "image/webp": "webp"}
+	if format != wantFormat[detectedType] {
 		return imageFormat{}, ErrUnsupportedPhoto
 	}
 
