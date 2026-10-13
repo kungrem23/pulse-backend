@@ -19,10 +19,11 @@
 ## Текущее состояние
 
 Работают health checks и базовые logging/recovery/metrics middleware. Написаны
-сервисы и HTTP-обработчики auth/session, анкеты/preferences/sleep, фото и ленты;
+сервисы и HTTP-обработчики auth/session, анкеты/preferences/sleep, фото, ленты,
+свайпов и списка мэтчей;
 приватные маршруты защищены user access JWT, зависимости собраны в `cmd/api`.
 PostgreSQL-адаптеры пока содержат пустые SQL-плейсхолдеры: реальный сценарий
-регистрации/анкеты/фото/ленты вернёт `500` до заполнения запросов. Unit-тесты и тесты
+регистрации/анкеты/фото/ленты/свайпов вернёт `500` до заполнения запросов. Unit-тесты и тесты
 HTTP → application с тестовыми адаптерами проходят; PostgreSQL-тесты без
 `PULSE_TEST_DATABASE_URL` пропускаются.
 
@@ -34,7 +35,14 @@ Go-часть T09 подключена: eligibility пользователя, cu
 свежими URL, read-only snapshot и пакетная загрузка фото. SQL отбора с взаимными
 фильтрами/исключениями и подтверждение на PostgreSQL ожидаются;
 инструкции — [docs/T09_DISCOVERY.md](docs/T09_DISCOVERY.md).
-Свайпы, список мэтчей и поздние операции остаются заглушками `501`.
+Go-часть T10–T11 подключена: транзакционный алгоритм свайпа, список своих пар
+с данными партнёра, фото и пагинацией. 10 новых repository SQL-запросов оставлены
+пустыми; атомарность и гонки ещё не подтверждены с PostgreSQL.
+T12 подключена: request ID, JSON-ошибки 404/405, CORS и лимиты auth;
+JSON-операции требуют `Content-Type: application/json`.
+Инструкция по интеграции и оставшимся плейсхолдерам:
+[docs/T10_T12_INTEGRATION.md](docs/T10_T12_INTEGRATION.md).
+Только поздние операции (чат, закрытие мэтча, модерация) остаются `501`.
 OpenAPI задаёт контракт, а `x-release` и `x-implementation-status` уточняют
 этап и готовность. Подробности — [AI/STATUS.md](AI/STATUS.md).
 
@@ -97,6 +105,14 @@ AI/                            контекст и инструкции для �
 `S3_ENDPOINT` доступен самому backend, а `S3_PUBLIC_ENDPOINT` должен быть
 доступен frontend: адаптер подписывает URL для него. Readiness проверяет и
 PostgreSQL, и наличие настроенного bucket.
+
+`CORS_ALLOWED_ORIGINS` — точные origins через запятую; пустое значение выключает
+CORS, wildcard и credentials запрещены. Например, для frontend:
+`http://localhost:5173`. Auth ограничивается отдельно на каждый маршрут и IP
+соединения: технические defaults `AUTH_RATE_LIMIT_REQUESTS=30`,
+`AUTH_RATE_LIMIT_WINDOW=1m`, `AUTH_RATE_LIMIT_MAX_KEYS=100000`.
+Лимитер локален для процесса и не доверяет `X-Forwarded-For`; за reverse proxy
+клиенты делят бюджет IP прокси. Пороги можно переопределить в окружении.
 
 ```bash
 docker compose up --build --detach

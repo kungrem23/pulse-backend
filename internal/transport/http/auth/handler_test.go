@@ -94,6 +94,8 @@ func TestRegisterCallsServiceAndReturnsRegistration(t *testing.T) {
 	))
 	response := httptest.NewRecorder()
 
+	request.Header.Set("Content-Type", "application/json")
+
 	handler.Register(response, request)
 
 	if response.Code != http.StatusCreated {
@@ -128,6 +130,8 @@ func TestLoginCallsUserService(t *testing.T) {
 	))
 	response := httptest.NewRecorder()
 
+	request.Header.Set("Content-Type", "application/json")
+
 	handler.Login(response, request)
 
 	if response.Code != http.StatusOK {
@@ -147,6 +151,8 @@ func TestLoginAdminCallsAdminService(t *testing.T) {
 		`{"username":"moderator","password":"secret"}`,
 	))
 	response := httptest.NewRecorder()
+
+	request.Header.Set("Content-Type", "application/json")
 
 	handler.LoginAdmin(response, request)
 
@@ -180,6 +186,8 @@ func TestRegisterMapsApplicationErrors(t *testing.T) {
 			))
 			response := httptest.NewRecorder()
 
+			request.Header.Set("Content-Type", "application/json")
+
 			handler.Register(response, request)
 
 			if response.Code != test.wantStatus {
@@ -209,6 +217,8 @@ func TestLoginMapsApplicationErrors(t *testing.T) {
 			))
 			response := httptest.NewRecorder()
 
+			request.Header.Set("Content-Type", "application/json")
+
 			handler.Login(response, request)
 
 			if response.Code != test.wantStatus {
@@ -225,6 +235,8 @@ func TestLoginAdminMapsInvalidCredentials(t *testing.T) {
 	))
 	response := httptest.NewRecorder()
 
+	request.Header.Set("Content-Type", "application/json")
+
 	handler.LoginAdmin(response, request)
 
 	if response.Code != http.StatusUnauthorized {
@@ -239,6 +251,8 @@ func TestInvalidJSONDoesNotCallService(t *testing.T) {
 		`{"email":"user@example.com","password":"secret","extra":true}`,
 	))
 	response := httptest.NewRecorder()
+
+	request.Header.Set("Content-Type", "application/json")
 
 	handler.Login(response, request)
 
@@ -267,6 +281,7 @@ func TestRefreshMapsResults(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			service := &authServiceStub{refreshErr: test.err, refreshResult: appauth.Session{AccessToken: "new-access"}}
 			request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh", bytes.NewBufferString(test.body))
+			request.Header.Set("Content-Type", "application/json")
 			response := httptest.NewRecorder()
 
 			NewHandler(service, nil).Refresh(response, request)
@@ -296,6 +311,7 @@ func TestLogoutTakesUserFromVerifiedAccessToken(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", bytes.NewBufferString(`{"refresh_token":"refresh"}`))
 	request.Header.Set("Authorization", "Bearer valid-access")
 	response := httptest.NewRecorder()
+	request.Header.Set("Content-Type", "application/json")
 	mux.ServeHTTP(response, request)
 
 	if response.Code != http.StatusNoContent || response.Body.Len() != 0 {
@@ -324,6 +340,7 @@ func TestLogoutRejectsMissingOrWrongToken(t *testing.T) {
 				request.Header.Set("Authorization", header)
 			}
 			response := httptest.NewRecorder()
+			request.Header.Set("Content-Type", "application/json")
 			mux.ServeHTTP(response, request)
 
 			if response.Code != http.StatusUnauthorized {

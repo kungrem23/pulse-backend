@@ -182,10 +182,10 @@ func TestSwipeMapsErrors(t *testing.T) {
 	}
 }
 
-func TestSwipeWithoutServiceIsNotImplemented(t *testing.T) {
+func TestSwipeWithoutServiceIsInternalError(t *testing.T) {
 	response := swipe(nil, `{"to_user_id":"`+targetID+`","is_like":true}`)
-	if response.Code != http.StatusNotImplemented {
-		t.Fatalf("expected 501, got %d", response.Code)
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", response.Code)
 	}
 }
 
@@ -280,9 +280,9 @@ func TestListMatchesMapsErrors(t *testing.T) {
 	}
 }
 
-func TestListMatchesWithoutServiceIsNotImplemented(t *testing.T) {
+func TestListMatchesWithoutServiceIsInternalError(t *testing.T) {
 	response := serve(nil, http.MethodGet, "/api/v1/matches", "")
-	if response.Code != http.StatusNotImplemented {
-		t.Fatalf("expected 501, got %d", response.Code)
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", response.Code)
 	}
 }

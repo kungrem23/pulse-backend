@@ -16,6 +16,7 @@ import (
 
 	appauth "github.com/kungrem23/pulse-backend/internal/app/auth"
 	appdiscovery "github.com/kungrem23/pulse-backend/internal/app/discovery"
+	appmatching "github.com/kungrem23/pulse-backend/internal/app/matching"
 	appmedia "github.com/kungrem23/pulse-backend/internal/app/media"
 	appprofile "github.com/kungrem23/pulse-backend/internal/app/profile"
 	"github.com/kungrem23/pulse-backend/internal/domain"
@@ -99,6 +100,8 @@ func (s *integrationServer) router(t *testing.T) http.Handler {
 		Discovery: appdiscovery.NewService(
 			postgres.NewDiscoveryRepository(s.pool), postgres.NewSearchStateRepository(s.pool), s.storage,
 		),
+		Matching: appmatching.NewService(postgres.NewSwipeRepository(s.pool), postgres.NewMatchRepository(s.pool),
+			postgres.NewSearchStateRepository(s.pool), s.storage),
 	})
 }
 

@@ -19,9 +19,9 @@ func NewHandler(service appmatching.Service) *Handler {
 }
 
 func (h *Handler) Swipe(w http.ResponseWriter, r *http.Request) {
-	// Until the swipe repository is wired in cmd/api the route stays unavailable.
+	// A missing dependency is a server configuration error, not a product stub.
 	if h.service == nil {
-		httpx.NotImplemented("like or dislike").ServeHTTP(w, r)
+		httpx.Error(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	userID, ok := middleware.UserID(r.Context())
@@ -48,9 +48,9 @@ func (h *Handler) Swipe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	// Until the match repository is wired in cmd/api the route stays unavailable.
+	// A missing dependency is a server configuration error, not a product stub.
 	if h.service == nil {
-		httpx.NotImplemented("list matches").ServeHTTP(w, r)
+		httpx.Error(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	userID, ok := middleware.UserID(r.Context())

@@ -7,6 +7,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/kungrem23/pulse-backend/internal/transport/http/middleware"
 )
 
 const defaultJWTSecret = "change-me-in-production-at-least-32-bytes"
@@ -20,6 +22,8 @@ type Config struct {
 	AccessTokenTTL    time.Duration
 	RefreshTokenTTL   time.Duration
 	PhotoStorage      PhotoStorageConfig
+	CORSOrigins       []string
+	AuthRateLimit     middleware.RateLimit
 	ShutdownTimeout   time.Duration
 	ReadHeaderTimeout time.Duration
 	ReadTimeout       time.Duration
@@ -58,6 +62,29 @@ func Load() (Config, error) {
 		IdleTimeout:       60 * time.Second,
 	}
 	var err error
+	cfg.CORSOrigins, err = middleware.ParseOrigins(env("CORS_ALLOWED_ORIGINS", ""))
+	if err != nil {
+		// ParseOrigins includes the input in its error; do not expose an origin
+		// containing accidentally supplied credentials in a startup log.
+		return Config{}, fmt.Errorf("CORS_ALLOWED_ORIGINS must contain exact HTTP(S) origins without credentials, paths or wildcards")
+	}
+	// Technical defaults, not product thresholds: each auth route/IP gets its
+	// own budget. MaxKeys bounds memory; these are overridable via environment.
+	cfg.AuthRateLimit.Requests, err = strconv.Atoi(env("AUTH_RATE_LIMIT_REQUESTS", "30"))
+	if err != nil {
+		return Config{}, fmt.Errorf("AUTH_RATE_LIMIT_REQUESTS must be a positive integer")
+	}
+	cfg.AuthRateLimit.Window, err = time.ParseDuration(env("AUTH_RATE_LIMIT_WINDOW", "1m"))
+	if err != nil {
+		return Config{}, fmt.Errorf("AUTH_RATE_LIMIT_WINDOW must be a duration of at least 1s")
+	}
+	cfg.AuthRateLimit.MaxKeys, err = strconv.Atoi(env("AUTH_RATE_LIMIT_MAX_KEYS", "100000"))
+	if err != nil {
+		return Config{}, fmt.Errorf("AUTH_RATE_LIMIT_MAX_KEYS must be a non-negative integer")
+	}
+	if err := cfg.AuthRateLimit.Validate(); err != nil {
+		return Config{}, fmt.Errorf("invalid auth rate limit configuration: %w", err)
+	}
 	cfg.DatabaseURL, err = databaseURL()
 	if err != nil {
 		return Config{}, err

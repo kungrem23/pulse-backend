@@ -16,6 +16,11 @@ info:
     preferences, discovery, swipes, and match lists. Chat, match closure, and
     moderation are later releases. A pair can match only once, even after closure.
     Release annotations describe scope, not implementation completeness.
+    JSON request bodies require Content-Type application/json (optional UTF-8
+    charset) and at most 16 KiB. Unsupported or missing Content-Type, unknown
+    fields and multiple JSON values return 400. Photo upload uses multipart.
+    Feed and match queries accept only cursor and limit; malformed, unknown
+    or repeated parameters return 400. Errors carry the response X-Request-ID.
 servers:
   - url: /
     description: Current Pulse API host
@@ -50,6 +55,8 @@ paths:
       summary: Check whether the API process is running
       security: []
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "200":
           description: API process is running
           content:
@@ -68,6 +75,8 @@ paths:
       summary: Check whether the API is ready to serve traffic
       security: []
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "200":
           description: API and its required dependencies are ready
           content:
@@ -198,6 +207,8 @@ paths:
             schema:
               $ref: "#/components/schemas/RefreshRequest"
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "200":
           description: New token pair issued
           content:
@@ -231,12 +242,16 @@ paths:
             schema:
               $ref: "#/components/schemas/RefreshRequest"
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "204":
           description: Session revoked
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 
   /api/v1/profile:
     get:
@@ -288,6 +303,8 @@ paths:
             schema:
               $ref: "#/components/schemas/PutProfileRequest"
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "200":
           description: Profile saved
           content:
@@ -320,6 +337,8 @@ paths:
             schema:
               $ref: "#/components/schemas/PutPreferencesRequest"
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "200":
           description: Preferences saved
           content:
@@ -361,6 +380,8 @@ paths:
             schema:
               $ref: "#/components/schemas/SetSleepRequest"
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "200":
           description: Sleep mode updated
           content:
@@ -524,7 +545,8 @@ paths:
         is not a UUID returns 422. A missing or non-boolean is_like returns 400.
         403 means the caller cannot take part in discovery: blocked, incomplete
         profile or preferences, no photos, or sleep mode.
-        Returns 501 until the swipe repository is wired in the server.
+        HTTP/application and PostgreSQL adapter are wired. SQL remains placeholders;
+        database atomicity and concurrency await verification with filled queries.
       x-required-principal: user
       security:
         - bearerAuth: []
@@ -535,8 +557,6 @@ paths:
             schema:
               $ref: "#/components/schemas/SwipeRequest"
       responses:
-        "501":
-          $ref: "#/components/responses/NotImplemented"
         "200":
           description: Swipe saved
           content:
@@ -575,7 +595,7 @@ paths:
         An empty, repeated or foreign cursor and an explicit limit outside
         1-100 (including 0) or not a plain integer return 400. 403 is returned
         only for a blocked caller.
-        Returns 501 until the match repository is wired in the server.
+        HTTP/application and PostgreSQL adapter are wired; list SQL is a placeholder.
       x-required-principal: user
       security:
         - bearerAuth: []
@@ -583,8 +603,6 @@ paths:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
-        "501":
-          $ref: "#/components/responses/NotImplemented"
         "200":
           description: A page of matches
           content:
@@ -617,6 +635,8 @@ paths:
       security:
         - bearerAuth: []
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "501":
           $ref: "#/components/responses/NotImplemented"
         "204":
@@ -643,6 +663,8 @@ paths:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "501":
           $ref: "#/components/responses/NotImplemented"
         "200":
@@ -674,6 +696,8 @@ paths:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/MessageLimit"
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "501":
           $ref: "#/components/responses/NotImplemented"
         "200":
@@ -707,6 +731,8 @@ paths:
             schema:
               $ref: "#/components/schemas/SendMessageRequest"
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "501":
           $ref: "#/components/responses/NotImplemented"
         "201":
@@ -745,6 +771,8 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateReportRequest"
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "501":
           $ref: "#/components/responses/NotImplemented"
         "201":
@@ -781,6 +809,8 @@ paths:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "501":
           $ref: "#/components/responses/NotImplemented"
         "200":
@@ -815,6 +845,8 @@ paths:
             schema:
               $ref: "#/components/schemas/ProcessReportRequest"
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "501":
           $ref: "#/components/responses/NotImplemented"
         "200":
@@ -849,6 +881,8 @@ paths:
       security:
         - bearerAuth: []
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "501":
           $ref: "#/components/responses/NotImplemented"
         "200":
@@ -883,6 +917,8 @@ paths:
             schema:
               $ref: "#/components/schemas/BlockUserRequest"
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "501":
           $ref: "#/components/responses/NotImplemented"
         "200":
@@ -922,6 +958,8 @@ paths:
             schema:
               $ref: "#/components/schemas/AdminMessageRequest"
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "501":
           $ref: "#/components/responses/NotImplemented"
         "201":
@@ -961,6 +999,8 @@ paths:
             schema:
               $ref: "#/components/schemas/NotificationRequest"
       responses:
+        "500":
+          $ref: "#/components/responses/InternalError"
         "501":
           $ref: "#/components/responses/NotImplemented"
         "202":

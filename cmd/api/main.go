@@ -11,6 +11,7 @@ import (
 
 	appauth "github.com/kungrem23/pulse-backend/internal/app/auth"
 	appdiscovery "github.com/kungrem23/pulse-backend/internal/app/discovery"
+	appmatching "github.com/kungrem23/pulse-backend/internal/app/matching"
 	appmedia "github.com/kungrem23/pulse-backend/internal/app/media"
 	appprofile "github.com/kungrem23/pulse-backend/internal/app/profile"
 	"github.com/kungrem23/pulse-backend/internal/config"
@@ -20,6 +21,7 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/security"
 	photostorage "github.com/kungrem23/pulse-backend/internal/storage/s3"
 	httpapi "github.com/kungrem23/pulse-backend/internal/transport/http"
+	"github.com/kungrem23/pulse-backend/internal/transport/http/middleware"
 )
 
 func main() {
@@ -28,6 +30,11 @@ func main() {
 		panic(err)
 	}
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	limiter, err := middleware.NewRateLimiter(cfg.AuthRateLimit)
+	if err != nil {
+		logger.Error("invalid auth rate limit configuration")
+		os.Exit(1)
+	}
 
 	tokens, err := security.NewTokenIssuer(security.TokenIssuerConfig{
 		Secret:          cfg.JWTSecret,
@@ -68,8 +75,10 @@ func main() {
 	server := &http.Server{
 		Addr: cfg.HTTPAddr,
 		Handler: httpapi.NewRouter(httpapi.Dependencies{
-			Logger:   logger,
-			Database: db,
+			Logger:          logger,
+			Database:        db,
+			CORSOrigins:     cfg.CORSOrigins,
+			AuthRateLimiter: limiter,
 			Auth: appauth.NewService(
 				postgres.NewUserRepository(db),
 				postgres.NewRefreshSessionRepository(db),
@@ -81,6 +90,9 @@ func main() {
 			Media:      appmedia.NewService(photos, photoStore),
 			Discovery: appdiscovery.NewService(
 				postgres.NewDiscoveryRepository(db), postgres.NewSearchStateRepository(db), photoStore,
+			),
+			Matching: appmatching.NewService(
+				postgres.NewSwipeRepository(db), postgres.NewMatchRepository(db), postgres.NewSearchStateRepository(db), photoStore,
 			),
 		}),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,

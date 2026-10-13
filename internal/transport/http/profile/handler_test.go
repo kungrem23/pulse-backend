@@ -17,7 +17,7 @@ import (
 type authenticatorStub struct{}
 
 func (authenticatorStub) Authenticate(context.Context, string) (string, error) {
-	return "user-from-token", nil
+	return "11111111-1111-4111-8111-111111111111", nil
 }
 
 type serviceStub struct {
@@ -63,6 +63,7 @@ func serveAt(service appprofile.Service, method, path, body string) *httptest.Re
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, NewHandler(service), middleware.RequireUser(authenticatorStub{}))
 	request := httptest.NewRequest(method, path, strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer token")
 	response := httptest.NewRecorder()
 	mux.ServeHTTP(response, request)
@@ -71,15 +72,15 @@ func serveAt(service appprofile.Service, method, path, body string) *httptest.Re
 
 func TestGetWithoutPreferencesReturnsNullAndEmptyPhotos(t *testing.T) {
 	service := &serviceStub{view: appprofile.View{
-		Profile: domain.Profile{UserID: "user-from-token", Name: "Анна", Age: 25, Sex: domain.SexFemale, City: "Москва"},
+		Profile: domain.Profile{UserID: "11111111-1111-4111-8111-111111111111", Name: "Анна", Age: 25, Sex: domain.SexFemale, City: "Москва"},
 	}}
 	response := serve(service, http.MethodGet, "")
 
-	want := `{"profile":{"user_id":"user-from-token","name":"Анна","bio":"","age":25,"sex":"female","city":"Москва","is_sleeping":false},"preferences":null,"photos":[]}`
+	want := `{"profile":{"user_id":"11111111-1111-4111-8111-111111111111","name":"Анна","bio":"","age":25,"sex":"female","city":"Москва","is_sleeping":false},"preferences":null,"photos":[]}`
 	if response.Code != http.StatusOK || strings.TrimSpace(response.Body.String()) != want {
 		t.Fatalf("unexpected response %d: %s", response.Code, response.Body)
 	}
-	if service.getUser != "user-from-token" {
+	if service.getUser != "11111111-1111-4111-8111-111111111111" {
 		t.Fatalf("the user must come from the access token, got %q", service.getUser)
 	}
 }
@@ -118,13 +119,13 @@ func TestGetMapsErrors(t *testing.T) {
 }
 
 func TestUpdatePassesFieldsAndUserFromToken(t *testing.T) {
-	service := &serviceStub{profile: domain.Profile{UserID: "user-from-token", Name: "Анна", Age: 25, Sex: domain.SexFemale, City: "Москва", IsSleeping: true}}
+	service := &serviceStub{profile: domain.Profile{UserID: "11111111-1111-4111-8111-111111111111", Name: "Анна", Age: 25, Sex: domain.SexFemale, City: "Москва", IsSleeping: true}}
 	response := serve(service, http.MethodPut, `{"name":"Анна","age":25,"sex":"female","city":"Москва","bio":"Привет"}`)
 
 	if response.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", response.Code, response.Body)
 	}
-	want := appprofile.UpdateCommand{UserID: "user-from-token", Name: "Анна", Bio: "Привет", Age: 25, Sex: "female", City: "Москва"}
+	want := appprofile.UpdateCommand{UserID: "11111111-1111-4111-8111-111111111111", Name: "Анна", Bio: "Привет", Age: 25, Sex: "female", City: "Москва"}
 	if service.command != want {
 		t.Fatalf("unexpected command %+v", service.command)
 	}
@@ -169,11 +170,11 @@ func TestUpdatePreferences(t *testing.T) {
 	service := &serviceStub{}
 	response := serveAt(service, http.MethodPut, "/api/v1/preferences", `{"min_age":20,"max_age":30,"sex":"any"}`)
 
-	want := `{"user_id":"user-from-token","min_age":20,"max_age":30,"sex":"any"}`
+	want := `{"user_id":"11111111-1111-4111-8111-111111111111","min_age":20,"max_age":30,"sex":"any"}`
 	if response.Code != http.StatusOK || strings.TrimSpace(response.Body.String()) != want {
 		t.Fatalf("unexpected response %d: %s", response.Code, response.Body)
 	}
-	if service.preferencesCommand != (appprofile.PreferencesCommand{UserID: "user-from-token", MinAge: 20, MaxAge: 30, Sex: "any"}) {
+	if service.preferencesCommand != (appprofile.PreferencesCommand{UserID: "11111111-1111-4111-8111-111111111111", MinAge: 20, MaxAge: 30, Sex: "any"}) {
 		t.Fatalf("unexpected command %+v", service.preferencesCommand)
 	}
 }
@@ -209,7 +210,7 @@ func TestSetSleep(t *testing.T) {
 		if response.Code != http.StatusOK || strings.TrimSpace(response.Body.String()) != `{"is_sleeping":`+value+`}` {
 			t.Fatalf("unexpected response %d: %s", response.Code, response.Body)
 		}
-		if service.sleepUser != "user-from-token" || (service.sleepValue != (value == "true")) {
+		if service.sleepUser != "11111111-1111-4111-8111-111111111111" || (service.sleepValue != (value == "true")) {
 			t.Fatalf("unexpected call: user=%q value=%v", service.sleepUser, service.sleepValue)
 		}
 	}

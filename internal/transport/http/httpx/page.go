@@ -3,6 +3,7 @@ package httpx
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/kungrem23/pulse-backend/internal/domain"
@@ -16,11 +17,19 @@ var errInvalidPageQuery = errors.New("invalid pagination parameters")
 // an empty or repeated cursor, and a limit that is repeated, not a plain
 // decimal number or 0, are rejected.
 func ParsePageRequest(r *http.Request) (domain.PageRequest, error) {
-	query := r.URL.Query()
+	query, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		return domain.PageRequest{}, errInvalidPageQuery
+	}
+	for key := range query {
+		if key != "cursor" && key != "limit" {
+			return domain.PageRequest{}, errInvalidPageQuery
+		}
+	}
 	var request domain.PageRequest
 
 	if values, ok := query["cursor"]; ok {
-		if len(values) != 1 || values[0] == "" {
+		if len(values) != 1 || values[0] == "" || len(values[0]) > 512 {
 			return domain.PageRequest{}, errInvalidPageQuery
 		}
 		request.Cursor = values[0]

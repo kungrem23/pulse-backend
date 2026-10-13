@@ -67,12 +67,13 @@ func decodeRequest(contentType, body string) (decodeTarget, error) {
 }
 
 func TestDecodeJSONContentType(t *testing.T) {
-	for _, contentType := range []string{"", "application/json", "Application/JSON", "application/json; charset=utf-8", "application/json;charset=UTF-8"} {
+	for _, contentType := range []string{"application/json", "Application/JSON", "application/json; charset=utf-8", "application/json;charset=UTF-8"} {
 		if got, err := decodeRequest(contentType, `{"name":"a"}`); err != nil || got.Name != "a" {
 			t.Fatalf("%q must be accepted: %+v, %v", contentType, got, err)
 		}
 	}
 	for _, contentType := range []string{
+		"",
 		"text/plain", "text/plain;charset=UTF-8", "application/x-www-form-urlencoded", "multipart/form-data; boundary=x",
 		"application/json; charset=latin1", "application/jsonx", "application/problem+json", "garbage;;",
 	} {
@@ -95,21 +96,21 @@ func TestDecodeJSONStrictBody(t *testing.T) {
 			t.Fatalf("%s must be rejected", name)
 		}
 	}
-	if _, err := decodeRequest("", `{"name":"a"}`+"\n  "); err != nil {
+	if _, err := decodeRequest("application/json", `{"name":"a"}`+"\n  "); err != nil {
 		t.Fatalf("trailing whitespace must be accepted: %v", err)
 	}
 }
 
 func TestDecodeJSONBodyLimit(t *testing.T) {
 	padding := strings.Repeat(" ", MaxJSONBodyBytes-len(`{"name":"a"}`))
-	if _, err := decodeRequest("", `{"name":"a"}`+padding); err != nil {
+	if _, err := decodeRequest("application/json", `{"name":"a"}`+padding); err != nil {
 		t.Fatalf("a body of exactly the limit must be accepted: %v", err)
 	}
-	if _, err := decodeRequest("", `{"name":"a"}`+padding+" "); !errors.Is(err, ErrBodyTooLarge) {
+	if _, err := decodeRequest("application/json", `{"name":"a"}`+padding+" "); !errors.Is(err, ErrBodyTooLarge) {
 		t.Fatalf("expected ErrBodyTooLarge for trailing bytes over the limit, got %v", err)
 	}
 	long := `{"name":"` + strings.Repeat("a", MaxJSONBodyBytes) + `"}`
-	if _, err := decodeRequest("", long); !errors.Is(err, ErrBodyTooLarge) {
+	if _, err := decodeRequest("application/json", long); !errors.Is(err, ErrBodyTooLarge) {
 		t.Fatalf("expected ErrBodyTooLarge, got %v", err)
 	}
 }

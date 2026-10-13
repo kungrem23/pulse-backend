@@ -24,8 +24,8 @@ func (s *service) List(ctx context.Context, userID string, request domain.PageRe
 	if err != nil {
 		return domain.Page[MatchSummary]{}, fmt.Errorf("list matches: %w", err)
 	}
-	if len(result.Items) > query.Limit {
-		return domain.Page[MatchSummary]{}, errors.New("list matches: repository returned more items than the limit")
+	if len(result.Items) > query.Limit || (result.HasMore && len(result.Items) != query.Limit) {
+		return domain.Page[MatchSummary]{}, errors.New("list matches: repository returned an invalid page")
 	}
 
 	page := domain.Page[MatchSummary]{Items: make([]MatchSummary, 0, len(result.Items))}
@@ -40,7 +40,7 @@ func (s *service) List(ctx context.Context, userID string, request domain.PageRe
 		last := result.Items[len(result.Items)-1].Match
 		cursor, err := pagination.Encode(domain.PagePosition{CreatedAt: last.CreatedAt, ID: last.ID}, pagination.Matches, owner)
 		if err != nil {
-			return domain.Page[MatchSummary]{}, fmt.Errorf("list matches: next cursor: %w", err)
+			return domain.Page[MatchSummary]{}, fmt.Errorf("list matches: repository next cursor: %v", err)
 		}
 		page.NextCursor = cursor
 	}

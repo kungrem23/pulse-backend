@@ -111,6 +111,24 @@ func TestListEmptyIsNotNil(t *testing.T) {
 	}
 }
 
+func TestListRejectsInvalidRepositoryPage(t *testing.T) {
+	for _, result := range []domain.PageResult[domain.MatchWithPartner]{
+		{HasMore: true},
+		{Items: []domain.MatchWithPartner{entry(firstID, partnerID, nil)}, HasMore: true},
+		{Items: []domain.MatchWithPartner{entry(firstID, partnerID, nil), entry(secondID, targetID, nil), entry(firstID, partnerID, nil)}},
+	} {
+		page, err := listService(&matchRepositoryStub{result: result}, &photoStorageStub{}).List(context.Background(), callerID, domain.PageRequest{Limit: 2})
+		if err == nil || errors.Is(err, domain.ErrInvalidCursor) || len(page.Items) != 0 {
+			t.Fatalf("repository corruption must fail as internal error: %+v, %v", page, err)
+		}
+	}
+	invalid := entry("invalid", partnerID, nil)
+	_, err := listService(&matchRepositoryStub{result: domain.PageResult[domain.MatchWithPartner]{Items: []domain.MatchWithPartner{invalid}, HasMore: true}}, &photoStorageStub{}).List(context.Background(), callerID, domain.PageRequest{Limit: 1})
+	if err == nil || errors.Is(err, domain.ErrInvalidCursor) {
+		t.Fatalf("server-created invalid cursor must not become client 400: %v", err)
+	}
+}
+
 func TestListCursorRoundTrip(t *testing.T) {
 	matches := &matchRepositoryStub{result: domain.PageResult[domain.MatchWithPartner]{
 		Items:   []domain.MatchWithPartner{entry(firstID, partnerID, nil), entry(secondID, targetID, nil)},

@@ -22,9 +22,8 @@ var (
 )
 
 // DecodeJSON reads exactly one JSON value and rejects unknown fields.
-// An explicit Content-Type other than application/json (charset utf-8 only)
-// is rejected; a missing one is accepted. Browsers send text/plain for a
-// plain string body, so that case is rejected.
+// Content-Type must be application/json (charset utf-8 only), including when
+// the caller omits the header. Transport handlers map invalid bodies to 400.
 func DecodeJSON(r *http.Request, destination any) error {
 	if err := checkJSONContentType(r.Header.Get("Content-Type")); err != nil {
 		return err
@@ -50,7 +49,7 @@ func DecodeJSON(r *http.Request, destination any) error {
 
 func checkJSONContentType(value string) error {
 	if value == "" {
-		return nil
+		return ErrUnsupportedContentType
 	}
 	mediaType, params, err := mime.ParseMediaType(value)
 	if err != nil || mediaType != "application/json" {
@@ -73,9 +72,13 @@ type limitedReader struct {
 func (l *limitedReader) Read(p []byte) (int, error) {
 	if l.remaining <= 0 {
 		var probe [1]byte
-		if n, _ := l.reader.Read(probe[:]); n > 0 {
+		n, err := l.reader.Read(probe[:])
+		if n > 0 {
 			l.exceeded = true
 			return 0, ErrBodyTooLarge
+		}
+		if err != nil {
+			return 0, err
 		}
 		return 0, io.EOF
 	}

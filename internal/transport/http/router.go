@@ -26,17 +26,19 @@ import (
 // Dependencies содержит зависимости всех HTTP-обработчиков. Конкретные
 // реализации собираются в cmd/api, а не создаются внутри transport-слоя.
 type Dependencies struct {
-	Logger     *slog.Logger
-	Database   health.Pinger
-	PhotoStore health.Pinger
-	Auth       appauth.Service
-	AdminAuth  adminauth.Service
-	Profile    appprofile.Service
-	Media      appmedia.Service
-	Discovery  appdiscovery.Service
-	Matching   appmatching.Service
-	Chat       appchat.Service
-	Moderation appmoderation.Service
+	Logger          *slog.Logger
+	Database        health.Pinger
+	PhotoStore      health.Pinger
+	Auth            appauth.Service
+	AdminAuth       adminauth.Service
+	Profile         appprofile.Service
+	Media           appmedia.Service
+	Discovery       appdiscovery.Service
+	Matching        appmatching.Service
+	Chat            appchat.Service
+	Moderation      appmoderation.Service
+	CORSOrigins     []string
+	AuthRateLimiter *middleware.RateLimiter
 }
 
 func NewRouter(deps Dependencies) http.Handler {
@@ -60,8 +62,15 @@ func NewRouter(deps Dependencies) http.Handler {
 	httpchat.RegisterRoutes(mux, httpchat.NewHandler(deps.Chat), requireUser)
 	httpmoderation.RegisterRoutes(mux, httpmoderation.NewHandler(deps.Moderation), requireUser)
 
-	return middleware.Recover(
+	var handler http.Handler = middleware.JSONErrors(mux)
+	if deps.AuthRateLimiter != nil {
+		handler = deps.AuthRateLimiter.LimitRoutes(handler,
+			"POST /api/v1/auth/register", "POST /api/v1/auth/login",
+			"POST /api/v1/auth/refresh", "POST /api/v1/admin/auth/login")
+	}
+	handler = middleware.CORS(deps.CORSOrigins)(handler)
+	return middleware.RequestID(middleware.Recover(
 		deps.Logger,
-		metrics.Count(middleware.Logging(deps.Logger, mux)),
-	)
+		metrics.Count(middleware.Logging(deps.Logger, handler)),
+	))
 }

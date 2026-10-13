@@ -102,3 +102,39 @@ func TestLoadRejectsInvalidTokenTTL(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadHTTPPolicyDefaultsAndOverrides(t *testing.T) {
+	for _, name := range []string{"CORS_ALLOWED_ORIGINS", "AUTH_RATE_LIMIT_REQUESTS", "AUTH_RATE_LIMIT_WINDOW", "AUTH_RATE_LIMIT_MAX_KEYS"} {
+		t.Setenv(name, "")
+	}
+	cfg, err := Load()
+	if err != nil || len(cfg.CORSOrigins) != 0 || cfg.AuthRateLimit.Requests != 30 || cfg.AuthRateLimit.Window != time.Minute || cfg.AuthRateLimit.MaxKeys != 100000 {
+		t.Fatalf("HTTP policy defaults: %v", err)
+	}
+	t.Setenv("CORS_ALLOWED_ORIGINS", "https://frontend.example,http://localhost:5173,https://frontend.example")
+	t.Setenv("AUTH_RATE_LIMIT_REQUESTS", "7")
+	t.Setenv("AUTH_RATE_LIMIT_WINDOW", "2m")
+	t.Setenv("AUTH_RATE_LIMIT_MAX_KEYS", "200")
+	cfg, err = Load()
+	if err != nil || len(cfg.CORSOrigins) != 2 || cfg.AuthRateLimit.Requests != 7 || cfg.AuthRateLimit.Window != 2*time.Minute || cfg.AuthRateLimit.MaxKeys != 200 {
+		t.Fatalf("HTTP policy overrides: %v", err)
+	}
+}
+
+func TestLoadRejectsInvalidHTTPPolicy(t *testing.T) {
+	for _, test := range []struct{ key, value string }{
+		{"CORS_ALLOWED_ORIGINS", "*"}, {"CORS_ALLOWED_ORIGINS", "https://frontend.example/path"},
+		{"CORS_ALLOWED_ORIGINS", "https://user:DO-NOT-LOG-THIS@example.test"},
+		{"AUTH_RATE_LIMIT_REQUESTS", "0"}, {"AUTH_RATE_LIMIT_REQUESTS", "-1"}, {"AUTH_RATE_LIMIT_REQUESTS", "abc"},
+		{"AUTH_RATE_LIMIT_WINDOW", "0s"}, {"AUTH_RATE_LIMIT_WINDOW", "500ms"}, {"AUTH_RATE_LIMIT_WINDOW", "abc"},
+		{"AUTH_RATE_LIMIT_MAX_KEYS", "-1"}, {"AUTH_RATE_LIMIT_MAX_KEYS", "abc"},
+	} {
+		t.Run(test.key+"/"+test.value, func(t *testing.T) {
+			t.Setenv(test.key, test.value)
+			_, err := Load()
+			if err == nil || strings.Contains(err.Error(), "DO-NOT-LOG-THIS") {
+				t.Fatalf("invalid policy must be rejected without leaking credentials: %v", err)
+			}
+		})
+	}
+}
