@@ -472,7 +472,7 @@ paths:
       tags: [Discovery]
       operationId: getDiscoveryFeed
       x-release: mvp
-      x-implementation-status: placeholder
+      x-implementation-status: partial
       summary: Get profile recommendations
       description: |
         Requires a completed profile, preferences, at least one photo, and sleep
@@ -482,6 +482,11 @@ paths:
         array when exhausted; MVP does not reset swipe history.
         Pagination order is users.created_at descending, then users.id descending.
         Cursors belong to this list and the authenticated user.
+        HTTP/application, snapshot reads and bulk photo adapter wiring are implemented;
+        search-state, candidate and bulk-photo SQL queries are placeholders.
+        Only cursor and limit query parameters are accepted; empty, duplicate or
+        malformed parameters return 400. Unfinished onboarding, no photos or sleep
+        return 403. Candidate filtering and SQL performance await database verification.
       x-required-principal: user
       security:
         - bearerAuth: []
@@ -489,8 +494,6 @@ paths:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
-        "501":
-          $ref: "#/components/responses/NotImplemented"
         "200":
           description: A page of candidates
           content:
@@ -503,6 +506,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /api/v1/swipes:
     post:

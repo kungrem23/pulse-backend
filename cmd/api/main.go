@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	appauth "github.com/kungrem23/pulse-backend/internal/app/auth"
+	appdiscovery "github.com/kungrem23/pulse-backend/internal/app/discovery"
 	appmedia "github.com/kungrem23/pulse-backend/internal/app/media"
 	appprofile "github.com/kungrem23/pulse-backend/internal/app/profile"
 	"github.com/kungrem23/pulse-backend/internal/config"
@@ -78,6 +79,9 @@ func main() {
 			PhotoStore: photoStore,
 			Profile:    appprofile.NewService(postgres.NewProfileRepository(db), photos, photoStore),
 			Media:      appmedia.NewService(photos, photoStore),
+			Discovery: appdiscovery.NewService(
+				postgres.NewDiscoveryRepository(db), postgres.NewSearchStateRepository(db), photoStore,
+			),
 		}),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		ReadTimeout:       cfg.ReadTimeout,

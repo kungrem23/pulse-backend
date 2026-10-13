@@ -15,6 +15,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	appauth "github.com/kungrem23/pulse-backend/internal/app/auth"
+	appdiscovery "github.com/kungrem23/pulse-backend/internal/app/discovery"
 	appmedia "github.com/kungrem23/pulse-backend/internal/app/media"
 	appprofile "github.com/kungrem23/pulse-backend/internal/app/profile"
 	"github.com/kungrem23/pulse-backend/internal/domain"
@@ -95,6 +96,9 @@ func (s *integrationServer) router(t *testing.T) http.Handler {
 		),
 		Profile: appprofile.NewService(postgres.NewProfileRepository(s.pool), photos, s.storage),
 		Media:   appmedia.NewService(photos, s.storage),
+		Discovery: appdiscovery.NewService(
+			postgres.NewDiscoveryRepository(s.pool), postgres.NewSearchStateRepository(s.pool), s.storage,
+		),
 	})
 }
 

@@ -19,10 +19,10 @@
 ## Текущее состояние
 
 Работают health checks и базовые logging/recovery/metrics middleware. Написаны
-сервисы и HTTP-обработчики auth/session, анкеты/preferences/sleep и фото;
+сервисы и HTTP-обработчики auth/session, анкеты/preferences/sleep, фото и ленты;
 приватные маршруты защищены user access JWT, зависимости собраны в `cmd/api`.
 PostgreSQL-адаптеры пока содержат пустые SQL-плейсхолдеры: реальный сценарий
-регистрации/анкеты/фото вернёт `500` до заполнения запросов. Unit-тесты и тесты
+регистрации/анкеты/фото/ленты вернёт `500` до заполнения запросов. Unit-тесты и тесты
 HTTP → application с тестовыми адаптерами проходят; PostgreSQL-тесты без
 `PULSE_TEST_DATABASE_URL` пропускаются.
 
@@ -30,7 +30,11 @@ Go-часть T08 подключена: multipart upload, owner-scoped delete, �
 JPEG/PNG/WebP до 10 MiB, позиции 1–5, компенсация и фото в ответе анкеты.
 SQL и проверка с реальными PostgreSQL/MinIO остаются отдельным этапом;
 инструкции — [docs/T08_PHOTOS.md](docs/T08_PHOTOS.md).
-Лента, свайпы, список мэтчей и поздние операции остаются заглушками `501`.
+Go-часть T09 подключена: eligibility пользователя, cursor/limit, карточки со
+свежими URL, read-only snapshot и пакетная загрузка фото. SQL отбора с взаимными
+фильтрами/исключениями и подтверждение на PostgreSQL ожидаются;
+инструкции — [docs/T09_DISCOVERY.md](docs/T09_DISCOVERY.md).
+Свайпы, список мэтчей и поздние операции остаются заглушками `501`.
 OpenAPI задаёт контракт, а `x-release` и `x-implementation-status` уточняют
 этап и готовность. Подробности — [AI/STATUS.md](AI/STATUS.md).
 
