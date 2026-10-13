@@ -104,7 +104,9 @@ AI/                            контекст и инструкции для �
 Для хранилища используются `S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT`, `S3_BUCKET`,
 `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION` и `S3_PRESIGN_TTL`.
 `S3_ENDPOINT` доступен самому backend, а `S3_PUBLIC_ENDPOINT` должен быть
-доступен frontend: адаптер подписывает URL для него. Readiness проверяет и
+доступен frontend: адаптер подписывает URL для него. Compose передаёт
+`S3_PUBLIC_ENDPOINT`, по умолчанию `http://localhost:<S3_PUBLISHED_PORT>`
+(порт 9000). Readiness проверяет и
 PostgreSQL, и наличие настроенного bucket.
 
 `CORS_ALLOWED_ORIGINS` — точные origins через запятую; пустое значение выключает
