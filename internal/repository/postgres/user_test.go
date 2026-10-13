@@ -12,10 +12,11 @@ import (
 )
 
 func TestUserRepositoryCreateAndFind(t *testing.T) {
-	repository := postgres.NewUserRepository(pgtest.NewDatabase(t))
+	pool := pgtest.NewDatabase(t)
+	repository := postgres.NewUserRepository(pool)
 	ctx := context.Background()
 
-	created, err := repository.Create(ctx, domain.User{Email: "user@example.com", PasswordHash: "hash", Age: 18})
+	created, err := repository.Create(ctx, domain.User{Email: "user@example.com", PasswordHash: "hash"})
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -33,8 +34,26 @@ func TestUserRepositoryCreateAndFind(t *testing.T) {
 	}
 	for _, found := range []domain.User{byEmail, byID} {
 		if found.ID != created.ID || found.Email != "user@example.com" ||
-			found.PasswordHash != "hash" || found.Age != 18 || !found.CreatedAt.Equal(created.CreatedAt) {
+			found.PasswordHash != "hash" || found.Age != nil || !found.CreatedAt.Equal(created.CreatedAt) {
 			t.Fatalf("unexpected user: %+v", found)
+		}
+	}
+	if _, err := postgres.NewProfileRepository(pool).Save(ctx, domain.Profile{
+		UserID: created.ID, Name: "Анна", Age: 18, Sex: domain.SexFemale, City: "Москва",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	byEmail, err = repository.ByEmail(ctx, created.Email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byID, err = repository.ByID(ctx, created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, found := range []domain.User{byEmail, byID} {
+		if found.Age == nil || *found.Age != 18 {
+			t.Fatalf("user reads must return the age saved with the profile: %+v", found)
 		}
 	}
 }
@@ -58,9 +77,9 @@ func TestUserRepositoryRejectsInvalidRows(t *testing.T) {
 	ctx := context.Background()
 
 	for _, user := range []domain.User{
-		{Email: "young@example.com", PasswordHash: "hash", Age: 17},
-		{Email: "old@example.com", PasswordHash: "hash", Age: 121},
-		{Email: "Upper@Example.com", PasswordHash: "hash", Age: 30},
+		{Email: "young@example.com", PasswordHash: "hash", Age: agePointer(17)},
+		{Email: "old@example.com", PasswordHash: "hash", Age: agePointer(121)},
+		{Email: "Upper@Example.com", PasswordHash: "hash", Age: agePointer(30)},
 	} {
 		if _, err := repository.Create(ctx, user); err == nil || errors.Is(err, domain.ErrConflict) {
 			t.Fatalf("expected a constraint error for %+v, got %v", user, err)
@@ -79,7 +98,7 @@ func TestUserRepositoryConcurrentDuplicateEmail(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			_, err := repository.Create(context.Background(), domain.User{
-				Email: "same@example.com", PasswordHash: "hash", Age: 25,
+				Email: "same@example.com", PasswordHash: "hash",
 			})
 			errs <- err
 		}()
@@ -102,3 +121,5 @@ func TestUserRepositoryConcurrentDuplicateEmail(t *testing.T) {
 		t.Fatalf("expected 1 success and %d conflicts, got %d and %d", attempts-1, created, conflicts)
 	}
 }
+
+func agePointer(age int) *int { return &age }

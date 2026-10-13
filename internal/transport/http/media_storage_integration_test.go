@@ -82,7 +82,7 @@ func TestPhotosWithPostgresAndS3(t *testing.T) {
 	}
 	register := func(email string) (string, string) {
 		t.Helper()
-		response := server.do(t, "/api/v1/auth/register", `{"email":"`+email+`","password":"password123","age":25}`, "")
+		response := server.do(t, "/api/v1/auth/register", `{"email":"`+email+`","password":"password123"}`, "")
 		expect(response, 201)
 		var body struct {
 			User struct {

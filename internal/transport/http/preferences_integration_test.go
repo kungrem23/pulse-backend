@@ -17,7 +17,7 @@ func TestPreferencesAndSleepWithPostgres(t *testing.T) {
 		}
 	}
 	register := func(email string) string {
-		response := server.do(t, "/api/v1/auth/register", `{"email":"`+email+`","password":"password123","age":20}`, "")
+		response := server.do(t, "/api/v1/auth/register", `{"email":"`+email+`","password":"password123"}`, "")
 		expect(response.Code, http.StatusCreated, "register", response.Body.String())
 		var body struct {
 			Session struct {

@@ -43,10 +43,11 @@ type Admin struct {
 	PasswordHash string `json:"-"`
 }
 
+// User.Age is nil until the user creates a profile.
 type User struct {
 	ID           string    `json:"id"`
 	Email        string    `json:"email"`
-	Age          int       `json:"age"`
+	Age          *int      `json:"age,omitempty"`
 	PasswordHash string    `json:"-"`
 	IsBlocked    bool      `json:"is_blocked"`
 	CreatedAt    time.Time `json:"created_at"`

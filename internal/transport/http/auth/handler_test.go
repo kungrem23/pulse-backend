@@ -77,7 +77,6 @@ func TestRegisterCallsServiceAndReturnsRegistration(t *testing.T) {
 			User: domain.User{
 				ID:        "user-1",
 				Email:     "user@example.com",
-				Age:       18,
 				CreatedAt: accessExpiresAt,
 			},
 			Session: appauth.Session{
@@ -90,7 +89,7 @@ func TestRegisterCallsServiceAndReturnsRegistration(t *testing.T) {
 	}
 	handler := NewHandler(service, nil)
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", bytes.NewBufferString(
-		`{"email":"user@example.com","password":"password123","age":18}`,
+		`{"email":"user@example.com","password":"password123"}`,
 	))
 	response := httptest.NewRecorder()
 
@@ -104,7 +103,7 @@ func TestRegisterCallsServiceAndReturnsRegistration(t *testing.T) {
 	if service.registerCalls != 1 {
 		t.Fatalf("expected one service call, got %d", service.registerCalls)
 	}
-	if service.registerCommand != (appauth.RegisterCommand{Email: "user@example.com", Password: "password123", Age: 18}) {
+	if service.registerCommand != (appauth.RegisterCommand{Email: "user@example.com", Password: "password123"}) {
 		t.Fatalf("unexpected command: %+v", service.registerCommand)
 	}
 
@@ -171,7 +170,6 @@ func TestRegisterMapsApplicationErrors(t *testing.T) {
 		wantStatus int
 	}{
 		{name: "invalid email", err: appauth.ErrInvalidEmail, wantStatus: http.StatusUnprocessableEntity},
-		{name: "invalid age", err: appauth.ErrInvalidAge, wantStatus: http.StatusUnprocessableEntity},
 		{name: "invalid password", err: appauth.ErrInvalidPassword, wantStatus: http.StatusUnprocessableEntity},
 		{name: "email exists", err: appauth.ErrEmailAlreadyExists, wantStatus: http.StatusConflict},
 		{name: "unexpected", err: errors.New("database unavailable"), wantStatus: http.StatusInternalServerError},
@@ -182,7 +180,7 @@ func TestRegisterMapsApplicationErrors(t *testing.T) {
 			service := &authServiceStub{registerErr: test.err}
 			handler := NewHandler(service, nil)
 			request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", bytes.NewBufferString(
-				`{"email":"user@example.com","password":"password123","age":18}`,
+				`{"email":"user@example.com","password":"password123"}`,
 			))
 			response := httptest.NewRecorder()
 

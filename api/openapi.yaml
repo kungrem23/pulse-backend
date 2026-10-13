@@ -99,6 +99,7 @@ paths:
       x-release: mvp
       x-implementation-status: implemented
       summary: Register a user
+      description: Registers with email and password only. Age is required later when creating a profile.
       security: []
       requestBody:
         required: true
@@ -1224,7 +1225,7 @@ components:
     RegisterRequest:
       type: object
       additionalProperties: false
-      required: [email, password, age]
+      required: [email, password]
       properties:
         email:
           type: string
@@ -1236,11 +1237,6 @@ components:
           minLength: 8
           maxLength: 72
           description: Must contain no more than 72 UTF-8 bytes because bcrypt is used.
-        age:
-          type: integer
-          minimum: 18
-          maximum: 120
-          description: Required declared age. Invalid age prevents registration before any user is created.
 
     LoginRequest:
       type: object
@@ -1318,7 +1314,7 @@ components:
     User:
       type: object
       additionalProperties: false
-      required: [id, email, age, is_blocked, created_at]
+      required: [id, email, is_blocked, created_at]
       properties:
         id:
           type: string
@@ -1327,6 +1323,7 @@ components:
           type: string
           format: email
         age:
+          description: Omitted until a profile is created. Stored only in users.age.
           type: integer
           minimum: 18
           maximum: 120

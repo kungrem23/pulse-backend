@@ -21,7 +21,8 @@ const (
 // Parameter and result column order follow the repository contract.
 // The Go code scans results positionally.
 const (
-	// Params: $1 email (normalized), $2 password_hash, $3 age.
+	// Params: $1 email (normalized), $2 password_hash, $3 nullable age.
+	// Registration supplies nil; profile saves set the age later.
 	// Returns one row: id (UUID as text), is_blocked, created_at.
 	// A duplicate email must fail with unique_violation (23505).
 	createUserQuery = `

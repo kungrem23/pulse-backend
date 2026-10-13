@@ -36,12 +36,9 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	registration, err := h.service.Register(r.Context(), appauth.RegisterCommand{
 		Email:    request.Email,
 		Password: request.Password,
-		Age:      request.Age,
 	})
 	if err != nil {
 		switch {
-		case errors.Is(err, appauth.ErrInvalidAge):
-			httpx.Error(w, http.StatusUnprocessableEntity, "age must be between 18 and 120")
 		case errors.Is(err, appauth.ErrInvalidEmail):
 			httpx.Error(w, http.StatusUnprocessableEntity, "invalid email")
 		case errors.Is(err, appauth.ErrInvalidPassword):

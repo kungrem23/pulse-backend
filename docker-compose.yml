@@ -51,6 +51,7 @@ services:
       - postgres_data:/var/lib/postgresql
       - ./migrations/initial_001.sql:/docker-entrypoint-initdb.d/001_initial.sql:ro
       - ./migrations/decisions_002.sql:/docker-entrypoint-initdb.d/002_decisions.sql:ro
+      - ./migrations/profile_age_003.sql:/docker-entrypoint-initdb.d/003_profile_age.sql:ro
     ports:
       - "${DB_PUBLISHED_PORT:-5432}:5432"
     restart: unless-stopped
@@ -71,9 +72,9 @@ services:
       - -ec
       - |
         test "$$(psql -X -Atqc "
-          SELECT count(*) = 2
+          SELECT count(*) = 3
           FROM schema_migrations
-          WHERE version IN ('initial_001', 'decisions_002')
+          WHERE version IN ('initial_001', 'decisions_002', 'profile_age_003')
         ")" = "t"
         test "$$(psql -X -Atqc "
           SELECT count(*) = 7

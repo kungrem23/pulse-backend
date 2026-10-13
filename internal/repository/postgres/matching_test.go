@@ -47,7 +47,7 @@ type matchingFixture struct{ pool *pgxpool.Pool }
 func (f matchingFixture) createUser(t *testing.T, spec matchtest.UserSpec, noProfile bool, min, max int16, searchSex domain.SearchSex) string {
 	t.Helper()
 	ctx := context.Background()
-	user, err := postgres.NewUserRepository(f.pool).Create(ctx, domain.User{Email: uuid.NewString() + "@example.test", PasswordHash: "test-hash", Age: spec.Age})
+	user, err := postgres.NewUserRepository(f.pool).Create(ctx, domain.User{Email: uuid.NewString() + "@example.test", PasswordHash: "test-hash"})
 	if err != nil {
 		t.Fatal(err)
 	}

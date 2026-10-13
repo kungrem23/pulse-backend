@@ -8,7 +8,9 @@
 ## Схема и параметры
 
 Запросы рассчитаны на [decisions_002.sql](../migrations/decisions_002.sql),
-применяемую после [initial_001.sql](../migrations/initial_001.sql) на пустой БД.
+применяемую после [initial_001.sql](../migrations/initial_001.sql) на пустой БД,
+и [profile_age_003.sql](../migrations/profile_age_003.sql), допускающую NULL в
+users.age до заполнения анкеты.
 `profiles.city` уже объявлен как обязательный `TEXT` длиной 1–100 символов;
 `refresh_sessions` уже содержит UUID, владельца, уникальный хэш refresh,
 срок действия, время отзыва и ссылку `replaced_by`. Новая миграция для этих
@@ -39,7 +41,7 @@ COMMIT не повторяются автоматически.
 
 ### `createUserQuery`
 
-Создаёт пользователя с нормализованным email, хэшем пароля и возрастом. Возвращает UUID, блокировку и время создания; UNIQUE email предотвращает конкурентные дубликаты.
+Создаёт пользователя с нормализованным email и хэшем пароля; $3 — nullable age, при регистрации nil (SQL NULL). Возвращает UUID, блокировку и время создания; UNIQUE email предотвращает конкурентные дубликаты.
 
 ```sql
 INSERT INTO users (email, password_hash, age)
@@ -49,7 +51,7 @@ RETURNING id::text, is_blocked, created_at;
 
 ### `userByEmailQuery`
 
-Находит пользователя для входа. Хэш пароля нужен только сервису аутентификации и не попадает в публичный DTO.
+Находит пользователя для входа; NULL age читается как nil в domain.User.Age. Хэш пароля нужен только сервису аутентификации и не попадает в публичный DTO.
 
 ```sql
 SELECT id::text, email, password_hash, age, is_blocked, created_at

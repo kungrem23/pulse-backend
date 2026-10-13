@@ -7,8 +7,8 @@ DECLARE
     generated_id UUID;
 BEGIN
     IF (SELECT count(*) FROM schema_migrations
-        WHERE version IN ('initial_001', 'decisions_002')) <> 2 THEN
-        RAISE EXCEPTION 'expected both schema migrations';
+        WHERE version IN ('initial_001', 'decisions_002', 'profile_age_003')) <> 3 THEN
+        RAISE EXCEPTION 'expected all three schema migrations';
     END IF;
 
     IF EXISTS (
@@ -21,8 +21,8 @@ BEGIN
         RAISE EXCEPTION 'profiles.age must not exist';
     END IF;
 
-    INSERT INTO users(email, password_hash, age)
-    VALUES ('generated@example.test', 'hash', 18)
+    INSERT INTO users(email, password_hash)
+    VALUES ('generated@example.test', 'hash')
     RETURNING id INTO generated_id;
     IF generated_id IS NULL THEN
         RAISE EXCEPTION 'users.id UUID default did not generate a value';

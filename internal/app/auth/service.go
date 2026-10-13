@@ -14,7 +14,6 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrInvalidEmail       = errors.New("invalid email")
 	ErrInvalidPassword    = errors.New("invalid password")
-	ErrInvalidAge         = errors.New("age must be between 18 and 120")
 	ErrEmailAlreadyExists = errors.New("email already exists")
 	ErrUserBlocked        = errors.New("user is blocked")
 	// ErrInvalidRefreshToken covers malformed, expired, revoked, reused and
@@ -26,7 +25,6 @@ var (
 type RegisterCommand struct {
 	Email    string
 	Password string
-	Age      int
 }
 
 type LoginCommand struct {

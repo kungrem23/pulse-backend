@@ -17,7 +17,7 @@ func TestRefreshSessionExpiresWhileWaitingForLock(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	user, err := postgres.NewUserRepository(pool).Create(ctx, domain.User{
-		Email: "refresh-wait@example.test", PasswordHash: "hash", Age: 25,
+		Email: "refresh-wait@example.test", PasswordHash: "hash",
 	})
 	if err != nil {
 		t.Fatal(err)

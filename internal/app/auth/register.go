@@ -19,9 +19,6 @@ const (
 )
 
 func (s *service) Register(ctx context.Context, command RegisterCommand) (Registration, error) {
-	if command.Age < domain.MinAge || command.Age > domain.MaxAge {
-		return Registration{}, ErrInvalidAge
-	}
 	email, err := normalizeEmail(command.Email)
 	if err != nil {
 		return Registration{}, ErrInvalidEmail
@@ -37,7 +34,6 @@ func (s *service) Register(ctx context.Context, command RegisterCommand) (Regist
 
 	user, err := s.users.Create(ctx, domain.User{
 		Email:        email,
-		Age:          command.Age,
 		PasswordHash: passwordHash,
 	})
 	if err != nil {

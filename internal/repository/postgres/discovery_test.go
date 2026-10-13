@@ -56,7 +56,7 @@ func newDiscoveryFixture(t *testing.T) *discoveryFixture {
 func (f *discoveryFixture) user(t *testing.T, age int16, sex domain.Sex, hasProfile, hasPreferences, hasPhoto bool) domain.User {
 	t.Helper()
 	ctx := context.Background()
-	user, err := f.users.Create(ctx, domain.User{Email: uuid.NewString() + "@example.test", PasswordHash: "hash", Age: int(age)})
+	user, err := f.users.Create(ctx, domain.User{Email: uuid.NewString() + "@example.test", PasswordHash: "hash"})
 	if err != nil {
 		t.Fatal(err)
 	}

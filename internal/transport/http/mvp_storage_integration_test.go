@@ -30,7 +30,7 @@ func TestMVPWithPostgresAndS3(t *testing.T) {
 	}
 	create := func(email, sex, city string, complete bool) person {
 		t.Helper()
-		response := server.do(t, "/api/v1/auth/register", fmt.Sprintf(`{"email":%q,"password":"password123","age":25}`, email), "")
+		response := server.do(t, "/api/v1/auth/register", fmt.Sprintf(`{"email":%q,"password":"password123"}`, email), "")
 		expect("POST", "/api/v1/auth/register", response, 201)
 		var body struct {
 			User struct{ ID string } `json:"user"`

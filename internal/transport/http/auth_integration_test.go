@@ -119,7 +119,7 @@ func TestAuthHTTPWithPostgres(t *testing.T) {
 		return count
 	}
 
-	response := post("/api/v1/auth/register", `{"email":"  New.User@Example.COM ","password":"password123","age":18}`)
+	response := post("/api/v1/auth/register", `{"email":"  New.User@Example.COM ","password":"password123"}`)
 	if response.Code != http.StatusCreated {
 		t.Fatalf("register: expected 201, got %d: %s", response.Code, response.Body)
 	}
@@ -130,7 +130,7 @@ func TestAuthHTTPWithPostgres(t *testing.T) {
 		User struct {
 			ID        string    `json:"id"`
 			Email     string    `json:"email"`
-			Age       int       `json:"age"`
+			Age       *int      `json:"age"`
 			IsBlocked bool      `json:"is_blocked"`
 			CreatedAt time.Time `json:"created_at"`
 		} `json:"user"`
@@ -142,9 +142,26 @@ func TestAuthHTTPWithPostgres(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &registered); err != nil {
 		t.Fatal(err)
 	}
-	if registered.User.Email != "new.user@example.com" || registered.User.Age != 18 ||
+	if registered.User.Email != "new.user@example.com" || registered.User.Age != nil ||
 		registered.User.ID == "" || registered.User.CreatedAt.IsZero() || registered.Session.TokenType != "Bearer" {
 		t.Fatalf("unexpected registration: %+v", registered)
+	}
+	if strings.Contains(response.Body.String(), `"age"`) {
+		t.Fatalf("age must be omitted before profile creation: %s", response.Body)
+	}
+	var age *int
+	if err := pool.QueryRow(context.Background(), "SELECT age FROM users WHERE id = $1", registered.User.ID).Scan(&age); err != nil || age != nil {
+		t.Fatalf("new account must have NULL age: %v, %v", age, err)
+	}
+	for _, path := range []string{"/api/v1/feed", "/api/v1/profile"} {
+		result := server.get(t, path, registered.Session.AccessToken)
+		status := http.StatusForbidden
+		if path == "/api/v1/profile" {
+			status = http.StatusNotFound
+		}
+		if result.Code != status {
+			t.Fatalf("unfinished onboarding %s: expected %d, got %d: %s", path, status, result.Code, result.Body)
+		}
 	}
 	claims, err := tokens.Verify(registered.Session.AccessToken, security.AccessToken)
 	if err != nil || claims.Subject != registered.User.ID || claims.Principal != security.UserPrincipal {
@@ -157,12 +174,12 @@ func TestAuthHTTPWithPostgres(t *testing.T) {
 		status int
 		code   string
 	}{
-		{"duplicate email in another case", `{"email":"NEW.USER@example.com","password":"password123","age":30}`, http.StatusConflict, "conflict"},
-		{"age 17", `{"email":"a17@example.com","password":"password123","age":17}`, http.StatusUnprocessableEntity, "validation_failed"},
-		{"age 121", `{"email":"a121@example.com","password":"password123","age":121}`, http.StatusUnprocessableEntity, "validation_failed"},
-		{"missing age", `{"email":"noage@example.com","password":"password123"}`, http.StatusUnprocessableEntity, "validation_failed"},
-		{"negative age", `{"email":"neg@example.com","password":"password123","age":-1}`, http.StatusUnprocessableEntity, "validation_failed"},
-		{"fractional age", `{"email":"frac@example.com","password":"password123","age":18.5}`, http.StatusBadRequest, "bad_request"},
+		{"duplicate email in another case", `{"email":"NEW.USER@example.com","password":"password123"}`, http.StatusConflict, "conflict"},
+		{"invalid email", `{"email":"invalid","password":"password123"}`, http.StatusUnprocessableEntity, "validation_failed"},
+		{"missing email", `{"password":"password123"}`, http.StatusUnprocessableEntity, "validation_failed"},
+		{"missing password", `{"email":"missing@example.com"}`, http.StatusUnprocessableEntity, "validation_failed"},
+		{"short password", `{"email":"short@example.com","password":"short"}`, http.StatusUnprocessableEntity, "validation_failed"},
+		{"age belongs to profile", `{"email":"age@example.com","password":"password123","age":18}`, http.StatusBadRequest, "bad_request"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			response := post("/api/v1/auth/register", test.body)
@@ -173,13 +190,6 @@ func TestAuthHTTPWithPostgres(t *testing.T) {
 	}
 	if count := userCount(); count != 1 {
 		t.Fatalf("rejected registrations must not create users, found %d", count)
-	}
-
-	for _, age := range []string{"18", "120"} {
-		response := post("/api/v1/auth/register", `{"email":"edge`+age+`@example.com","password":"password123","age":`+age+`}`)
-		if response.Code != http.StatusCreated {
-			t.Fatalf("age %s: expected 201, got %d: %s", age, response.Code, response.Body)
-		}
 	}
 
 	response = post("/api/v1/auth/login", `{"email":"New.User@example.com","password":"password123"}`)

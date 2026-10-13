@@ -22,8 +22,8 @@ func TestAuthResponsesMatchOpenAPI(t *testing.T) {
 		service     *authServiceStub
 		contentType string
 	}{
-		{"/api/v1/auth/register", `{"email":"a@example.test","password":"password123","age":25}`, &authServiceStub{registerResult: appauth.Registration{User: domain.User{ID: "11111111-1111-4111-8111-111111111111", Email: "a@example.test", Age: 25, CreatedAt: time.Now().UTC()}, Session: session}}, "application/json"},
-		{"/api/v1/auth/register", `{}`, &authServiceStub{registerErr: appauth.ErrInvalidAge}, "application/json"},
+		{"/api/v1/auth/register", `{"email":"a@example.test","password":"password123"}`, &authServiceStub{registerResult: appauth.Registration{User: domain.User{ID: "11111111-1111-4111-8111-111111111111", Email: "a@example.test", CreatedAt: time.Now().UTC()}, Session: session}}, "application/json"},
+		{"/api/v1/auth/register", `{}`, &authServiceStub{registerErr: appauth.ErrInvalidEmail}, "application/json"},
 		{"/api/v1/auth/register", `{}`, &authServiceStub{registerErr: appauth.ErrEmailAlreadyExists}, "application/json"},
 		{"/api/v1/auth/login", `{"email":"a@example.test","password":"password123"}`, &authServiceStub{loginResult: session}, "application/json"},
 		{"/api/v1/auth/login", `{}`, &authServiceStub{loginErr: appauth.ErrInvalidCredentials}, "application/json"},

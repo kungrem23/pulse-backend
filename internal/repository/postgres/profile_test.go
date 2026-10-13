@@ -14,7 +14,7 @@ import (
 func TestProfileSaveIsAtomic(t *testing.T) {
 	pool := pgtest.NewDatabase(t)
 	ctx := context.Background()
-	user, err := postgres.NewUserRepository(pool).Create(ctx, domain.User{Email: "a@example.com", PasswordHash: "hash", Age: 20})
+	user, err := postgres.NewUserRepository(pool).Create(ctx, domain.User{Email: "a@example.com", PasswordHash: "hash"})
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -31,8 +31,8 @@ func TestProfileSaveIsAtomic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.Age != 20 {
-		t.Fatalf("a failed profile write must roll back users.age, got %d", stored.Age)
+	if stored.Age != nil {
+		t.Fatalf("a failed profile write must roll back users.age, got %v", stored.Age)
 	}
 	if _, err := profiles.ByUserID(ctx, user.ID); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("no profile must exist after the failed save, got %v", err)

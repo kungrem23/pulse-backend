@@ -41,10 +41,10 @@ func TestSessionLifecycleWithPostgres(t *testing.T) {
 		return server.do(t, "/api/v1/auth/refresh", `{"refresh_token":"`+token+`"}`, "")
 	}
 
-	registered := server.do(t, "/api/v1/auth/register", `{"email":"a@example.com","password":"password123","age":20}`, "")
+	registered := server.do(t, "/api/v1/auth/register", `{"email":"a@example.com","password":"password123"}`, "")
 	expect(registered, http.StatusCreated, "register A")
 	first := decodeSession(t, registered)
-	other := server.do(t, "/api/v1/auth/register", `{"email":"b@example.com","password":"password123","age":20}`, "")
+	other := server.do(t, "/api/v1/auth/register", `{"email":"b@example.com","password":"password123"}`, "")
 	expect(other, http.StatusCreated, "register B")
 	foreign := decodeSession(t, other)
 

@@ -9,7 +9,6 @@ import (
 type registerRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
-	Age      int    `json:"age"`
 }
 
 type userLoginRequest struct {
@@ -37,7 +36,7 @@ type sessionResponse struct {
 type userResponse struct {
 	ID        string    `json:"id"`
 	Email     string    `json:"email"`
-	Age       int       `json:"age"`
+	Age       *int      `json:"age,omitempty"`
 	IsBlocked bool      `json:"is_blocked"`
 	CreatedAt time.Time `json:"created_at"`
 }

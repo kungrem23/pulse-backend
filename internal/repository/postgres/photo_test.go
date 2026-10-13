@@ -21,7 +21,7 @@ func TestPhotoRepositoryOwnershipAndPositions(t *testing.T) {
 	photos := postgres.NewPhotoRepository(pool)
 	createUser := func(email string) string {
 		t.Helper()
-		user, err := users.Create(ctx, domain.User{Email: email, PasswordHash: "hash", Age: 25})
+		user, err := users.Create(ctx, domain.User{Email: email, PasswordHash: "hash"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -92,7 +92,7 @@ func TestPhotoRepositoryOwnershipAndPositions(t *testing.T) {
 func TestPhotoRepositoryConcurrentPosition(t *testing.T) {
 	pool := pgtest.NewDatabase(t)
 	ctx := context.Background()
-	user, err := postgres.NewUserRepository(pool).Create(ctx, domain.User{Email: "a@example.test", PasswordHash: "hash", Age: 25})
+	user, err := postgres.NewUserRepository(pool).Create(ctx, domain.User{Email: "a@example.test", PasswordHash: "hash"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -20,11 +20,16 @@ import (
 // databases. Tests never touch the database named in the URL itself.
 const EnvAdminURL = "PULSE_TEST_DATABASE_URL"
 
-var migrations = []string{"initial_001.sql", "decisions_002.sql"}
+var migrations = []string{"initial_001.sql", "decisions_002.sql", "profile_age_003.sql"}
 
 // NewDatabase creates a uniquely named database with the MVP schema and drops
 // it when the test finishes. The test is skipped when EnvAdminURL is unset.
 func NewDatabase(t *testing.T) *pgxpool.Pool {
+	t.Helper()
+	return newDatabase(t, migrations)
+}
+
+func newDatabase(t *testing.T, migrationFiles []string) *pgxpool.Pool {
 	t.Helper()
 	adminURL := os.Getenv(EnvAdminURL)
 	if adminURL == "" {
@@ -68,7 +73,7 @@ func NewDatabase(t *testing.T) *pgxpool.Pool {
 	}
 	t.Cleanup(pool.Close)
 
-	for _, file := range migrations {
+	for _, file := range migrationFiles {
 		sql, err := os.ReadFile(filepath.Join(migrationsDir(t), file))
 		if err != nil {
 			t.Fatalf("read migration %s: %v", file, err)

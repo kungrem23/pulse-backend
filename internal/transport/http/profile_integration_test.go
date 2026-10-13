@@ -19,7 +19,7 @@ func TestProfileWithPostgres(t *testing.T) {
 		}
 	}
 	register := func(email string) (string, string) {
-		response := server.do(t, "/api/v1/auth/register", `{"email":"`+email+`","password":"password123","age":20}`, "")
+		response := server.do(t, "/api/v1/auth/register", `{"email":"`+email+`","password":"password123"}`, "")
 		expect(response.Code, http.StatusCreated, "register "+email, response.Body.String())
 		var body struct {
 			User    struct{ ID string }
@@ -32,8 +32,8 @@ func TestProfileWithPostgres(t *testing.T) {
 		}
 		return body.User.ID, body.Session.AccessToken
 	}
-	storedAge := func(userID string) int {
-		var age int
+	storedAge := func(userID string) *int {
+		var age *int
 		if err := server.pool.QueryRow(ctx, "SELECT age FROM users WHERE id = $1", userID).Scan(&age); err != nil {
 			t.Fatal(err)
 		}
@@ -41,22 +41,30 @@ func TestProfileWithPostgres(t *testing.T) {
 	}
 
 	userA, tokenA := register("a@example.com")
+	if age := storedAge(userA); age != nil {
+		t.Fatalf("age must be NULL before creating a profile, got %v", age)
+	}
 	response := server.get(t, "/api/v1/profile", tokenA)
 	expect(response.Code, http.StatusNotFound, "profile right after registration", response.Body.String())
 
 	for name, body := range map[string]string{
-		"age 17":     `{"name":"Анна","age":17,"sex":"female","city":"Москва"}`,
-		"sex other":  `{"name":"Анна","age":30,"sex":"other","city":"Москва"}`,
-		"no city":    `{"name":"Анна","age":30,"sex":"female"}`,
-		"blank name": `{"name":"  ","age":30,"sex":"female","city":"Москва"}`,
-		"long bio":   `{"name":"Анна","age":30,"sex":"female","city":"Москва","bio":"` + strings.Repeat("ж", 501) + `"}`,
+		"missing age": `{"name":"Анна","sex":"female","city":"Москва"}`,
+		"null age":    `{"name":"Анна","age":null,"sex":"female","city":"Москва"}`,
+		"age 121":     `{"name":"Анна","age":121,"sex":"female","city":"Москва"}`,
+		"age 17":      `{"name":"Анна","age":17,"sex":"female","city":"Москва"}`,
+		"sex other":   `{"name":"Анна","age":30,"sex":"other","city":"Москва"}`,
+		"no city":     `{"name":"Анна","age":30,"sex":"female"}`,
+		"blank name":  `{"name":"  ","age":30,"sex":"female","city":"Москва"}`,
+		"long bio":    `{"name":"Анна","age":30,"sex":"female","city":"Москва","bio":"` + strings.Repeat("ж", 501) + `"}`,
 	} {
 		response := server.put(t, "/api/v1/profile", body, tokenA)
 		expect(response.Code, http.StatusUnprocessableEntity, "invalid create: "+name, response.Body.String())
 	}
 	expect(server.get(t, "/api/v1/profile", tokenA).Code, http.StatusNotFound, "rejected creates leave no profile", "")
-	if age := storedAge(userA); age != 20 {
-		t.Fatalf("rejected creates must not change users.age, got %d", age)
+	expect(server.put(t, "/api/v1/profile", `{"name":"Анна","age":18.5,"sex":"female","city":"Москва"}`, tokenA).Code,
+		http.StatusBadRequest, "fractional age", "")
+	if age := storedAge(userA); age != nil {
+		t.Fatalf("rejected creates must not change users.age, got %v", age)
 	}
 
 	response = server.put(t, "/api/v1/profile",
@@ -74,8 +82,8 @@ func TestProfileWithPostgres(t *testing.T) {
 	if saved.UserID != userA || saved.Name != "Анна" || saved.Age != 30 || saved.IsSleeping {
 		t.Fatalf("unexpected saved profile: %+v", saved)
 	}
-	if age := storedAge(userA); age != 30 {
-		t.Fatalf("users.age must be updated with the profile, got %d", age)
+	if age := storedAge(userA); age == nil || *age != 30 {
+		t.Fatalf("users.age must be updated with the profile, got %v", age)
 	}
 
 	response = server.get(t, "/api/v1/profile", tokenA)
@@ -97,7 +105,7 @@ func TestProfileWithPostgres(t *testing.T) {
 	before := server.get(t, "/api/v1/profile", tokenA).Body.String()
 	expect(server.put(t, "/api/v1/profile", `{"name":"Аня","age":121,"sex":"female","city":"Казань"}`, tokenA).Code,
 		http.StatusUnprocessableEntity, "invalid update", "")
-	if after := server.get(t, "/api/v1/profile", tokenA).Body.String(); after != before || storedAge(userA) != 31 {
+	if after := server.get(t, "/api/v1/profile", tokenA).Body.String(); after != before || storedAge(userA) == nil || *storedAge(userA) != 31 {
 		t.Fatalf("invalid update must not change anything:\nbefore %s\nafter  %s", before, after)
 	}
 
@@ -131,5 +139,13 @@ func TestProfileWithPostgres(t *testing.T) {
 	}
 	if profiles != 1 {
 		t.Fatalf("expected one profile for B, got %d", profiles)
+	}
+	for _, age := range []string{"18", "120"} {
+		id, token := register("edge" + age + "@example.com")
+		response := server.put(t, "/api/v1/profile", `{"name":"Анна","age":`+age+`,"sex":"female","city":"Москва"}`, token)
+		expect(response.Code, http.StatusOK, "create profile at age boundary "+age, response.Body.String())
+		if !strings.Contains(response.Body.String(), `"age":`+age) || storedAge(id) == nil {
+			t.Fatalf("age %s was not saved with the first profile: %s", age, response.Body)
+		}
 	}
 }

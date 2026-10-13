@@ -32,7 +32,7 @@ func TestMatchingHTTPWithPostgres(t *testing.T) {
 	}
 	person := func(name string, sex domain.Sex) (string, string) {
 		t.Helper()
-		body, _ := json.Marshal(map[string]any{"email": uuid.NewString() + "@example.test", "password": "password123", "age": 25})
+		body, _ := json.Marshal(map[string]any{"email": uuid.NewString() + "@example.test", "password": "password123"})
 		response := server.do(t, "/api/v1/auth/register", string(body), "")
 		expect("POST", "/api/v1/auth/register", response, http.StatusCreated)
 		var registered struct {
