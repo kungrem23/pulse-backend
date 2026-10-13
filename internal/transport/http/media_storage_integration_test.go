@@ -37,10 +37,11 @@ func (s *trackedPhotoStorage) Put(ctx context.Context, key string, content []byt
 	return stored, err
 }
 
-func TestPhotosWithPostgresAndS3(t *testing.T) {
+func newS3IntegrationServer(t *testing.T) *integrationServer {
+	t.Helper()
 	for _, name := range []string{"PULSE_TEST_DATABASE_URL", "S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY", "S3_SECRET_KEY"} {
 		if os.Getenv(name) == "" {
-			t.Skipf("%s is not set; configure isolated PostgreSQL/MinIO to run T08 integration", name)
+			t.Skipf("%s is not set; configure isolated PostgreSQL/MinIO for integration tests", name)
 		}
 	}
 	server := newIntegrationServer(t)
@@ -67,6 +68,12 @@ func TestPhotosWithPostgresAndS3(t *testing.T) {
 			}
 		}
 	})
+	return server
+}
+
+func TestPhotosWithPostgresAndS3(t *testing.T) {
+	server := newS3IntegrationServer(t)
+	tracked := server.storage.(*trackedPhotoStorage)
 	expect := func(response *httptest.ResponseRecorder, code int) {
 		t.Helper()
 		if response.Code != code {
@@ -174,7 +181,7 @@ func TestPhotosWithPostgresAndS3(t *testing.T) {
 	// Every created object, including failed concurrent/missing-profile uploads,
 	// must now be gone from real storage, not just from the metadata projection.
 	for _, key := range tracked.keys {
-		url, err := store.URL(context.Background(), key)
+		url, err := tracked.URL(context.Background(), key)
 		if err != nil {
 			t.Fatal(err)
 		}

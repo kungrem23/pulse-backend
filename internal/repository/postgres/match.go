@@ -8,7 +8,7 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/domain"
 )
 
-// TODO(db): $1 caller UUID, $2 after-created_at (nullable), $3 after-match UUID
+// $1 caller UUID, $2 after-created_at (nullable), $3 after-match UUID
 // (nullable), $4 limit+1. Only matches where caller is person1 OR person2.
 // Order matches.created_at DESC, matches.id DESC; exclusive keyset boundary.
 // JOIN the OTHER partner's profile and users.age, including closed pairs and
@@ -19,7 +19,22 @@ import (
 // partner user_id::text, name, bio, users.age, sex, city, is_sleeping;
 // optional photo id::text, user_id::text, object_key, position.
 // LIMIT match rows, not one-to-many photo rows. Do not require a conversation.
-const matchesByUserIDQuery = ""
+const matchesByUserIDQuery = `
+SELECT m.id::text, m.person1_id::text, m.person2_id::text, m.status, m.created_at,
+       p.user_id::text, p.name, p.bio, u.age, p.sex, p.city, p.is_sleeping,
+       ph.id::text, ph.user_id::text, ph.object_key, ph.position
+FROM matches m
+JOIN profiles p ON p.user_id = CASE WHEN m.person1_id = $1::uuid THEN m.person2_id ELSE m.person1_id END
+JOIN users u ON u.id = p.user_id
+LEFT JOIN LATERAL (
+    SELECT id, user_id, object_key, position FROM photos
+    WHERE user_id = p.user_id ORDER BY position ASC LIMIT 1
+) ph ON true
+WHERE (m.person1_id = $1::uuid OR m.person2_id = $1::uuid)
+  AND ($2::timestamptz IS NULL OR (m.created_at, m.id) < ($2::timestamptz, $3::uuid))
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT $4
+`
 
 type MatchRepository struct{ pool *pgxpool.Pool }
 
@@ -34,9 +49,6 @@ func (r *MatchRepository) ListByUserID(ctx context.Context, userID string, page 
 	}
 	if page.Limit < 1 || page.Limit > 100 {
 		return domain.PageResult[domain.MatchWithPartner]{}, domain.ErrInvalidLimit
-	}
-	if matchesByUserIDQuery == "" {
-		return domain.PageResult[domain.MatchWithPartner]{}, fmt.Errorf("list matches: %w", errQueryNotWritten)
 	}
 	var afterTime, afterID any
 	if page.After != nil {

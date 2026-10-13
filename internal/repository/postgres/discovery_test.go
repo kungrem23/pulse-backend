@@ -14,19 +14,27 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/testsupport/pgtest"
 )
 
-// TODO(db): test-fixture SQL is also left as placeholders at the owner's request.
-// These run ONLY on pgtest's throwaway database, never on the user's database.
+// Test-fixture queries run ONLY on pgtest's throwaway database.
 const (
 	// Params: $1 user UUID. Set users.is_blocked=true for one test user.
-	discoveryTestBlockUserQuery = ""
+	discoveryTestBlockUserQuery = `
+UPDATE users SET is_blocked = true, updated_at = now() WHERE id = $1::uuid
+`
 	// Params: $1 from UUID, $2 to UUID, $3 is_like. Insert a swipe.
-	discoveryTestSwipeQuery = ""
+	discoveryTestSwipeQuery = `
+INSERT INTO swipes (from_user_id, to_user_id, is_like) VALUES ($1::uuid, $2::uuid, $3)
+`
 	// Params: $1 ordered person1 UUID, $2 person2 UUID, $3 active|closed.
 	// Insert match; closed_at must be set for closed, NULL for active.
-	discoveryTestMatchQuery = ""
+	discoveryTestMatchQuery = `
+INSERT INTO matches (person1_id, person2_id, status, closed_at)
+VALUES ($1::uuid, $2::uuid, $3, CASE WHEN $3 = 'closed' THEN now() ELSE NULL END)
+`
 	// Params: $1 timestamp, $2 UUID array. Set users.created_at for only these IDs
 	// so tests exercise timestamp ties and UUID ordering, not time-based luck.
-	discoveryTestCreatedAtQuery = ""
+	discoveryTestCreatedAtQuery = `
+UPDATE users SET created_at = $1::timestamptz WHERE id = ANY($2::uuid[])
+`
 )
 
 type discoveryFixture struct {
@@ -78,9 +86,6 @@ func (f *discoveryFixture) preferences(t *testing.T, owner string, min, max int1
 
 func (f *discoveryFixture) fixtureSQL(t *testing.T, query string, args ...any) {
 	t.Helper()
-	if query == "" {
-		t.Fatal("T09 test fixture SQL is not written yet; fill the documented placeholder")
-	}
 	if _, err := f.pool.Exec(context.Background(), query, args...); err != nil {
 		t.Fatal(err)
 	}

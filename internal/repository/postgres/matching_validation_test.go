@@ -8,9 +8,8 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/domain"
 )
 
-// Without any DB connection, unfinished queries must fail explicitly, before
-// accessing a pool. Validation remains testable even while SQL is out of scope.
-func TestMatchingPlaceholderGuards(t *testing.T) {
+// Invalid inputs must be rejected before accessing a database connection.
+func TestMatchingRepositoryValidation(t *testing.T) {
 	const a = "11111111-1111-4111-8111-111111111111"
 	const b = "22222222-2222-4222-8222-222222222222"
 	ctx := context.Background()
@@ -25,11 +24,6 @@ func TestMatchingPlaceholderGuards(t *testing.T) {
 			t.Fatalf("unexpected validation: %+v %v", match, err)
 		}
 	}
-	if insertSwipeQuery == "" {
-		if match, err := swipes.Save(ctx, a, b, true); match != nil || !errors.Is(err, errQueryNotWritten) {
-			t.Fatalf("placeholder must fail safely: %+v %v", match, err)
-		}
-	}
 	matches := NewMatchRepository(nil)
 	for _, tc := range []struct {
 		owner string
@@ -40,11 +34,6 @@ func TestMatchingPlaceholderGuards(t *testing.T) {
 	} {
 		if _, err := matches.ListByUserID(ctx, tc.owner, domain.PageQuery{Limit: tc.limit}); !errors.Is(err, tc.want) {
 			t.Fatalf("unexpected validation: %v", err)
-		}
-	}
-	if matchesByUserIDQuery == "" {
-		if _, err := matches.ListByUserID(ctx, a, domain.PageQuery{Limit: 20}); !errors.Is(err, errQueryNotWritten) {
-			t.Fatalf("placeholder must fail safely: %v", err)
 		}
 	}
 }

@@ -12,8 +12,7 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/testsupport/pgtest"
 )
 
-// These tests require PULSE_TEST_DATABASE_URL and the SQL placeholders to be
-// filled. A configured test database must expose unfinished SQL as a failure.
+// These tests use a throwaway database configured by PULSE_TEST_DATABASE_URL.
 func TestPhotoRepositoryOwnershipAndPositions(t *testing.T) {
 	pool := pgtest.NewDatabase(t)
 	ctx := context.Background()
@@ -69,8 +68,8 @@ func TestPhotoRepositoryOwnershipAndPositions(t *testing.T) {
 	if err := photos.Create(ctx, newPhoto(6)); err == nil {
 		t.Fatal("sixth position must violate database constraints")
 	}
-	if listed, err := photos.ByUserID(ctx, other); err != nil || listed == nil || len(listed) != 0 {
-		t.Fatalf("no photos must be a non-nil empty slice: %+v, %v", listed, err)
+	if otherPhotos, err := photos.ByUserID(ctx, other); err != nil || otherPhotos == nil || len(otherPhotos) != 0 {
+		t.Fatalf("no photos must be a non-nil empty slice: %+v, %v", otherPhotos, err)
 	}
 	orphan := newPhoto(1)
 	orphan.UserID = uuid.NewString()

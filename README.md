@@ -22,36 +22,35 @@
 сервисы и HTTP-обработчики auth/session, анкеты/preferences/sleep, фото, ленты,
 свайпов и списка мэтчей;
 приватные маршруты защищены user access JWT, зависимости собраны в `cmd/api`.
-PostgreSQL-адаптеры пока содержат пустые SQL-плейсхолдеры: реальный сценарий
-регистрации/анкеты/фото/ленты/свайпов вернёт `500` до заполнения запросов. Unit-тесты и тесты
-HTTP → application с тестовыми адаптерами проходят; PostgreSQL-тесты без
-`PULSE_TEST_DATABASE_URL` пропускаются.
+PostgreSQL-запросы реализованы: регистрация, сессии, анкеты, фото, лента,
+свайпы и список мэтчей работают с реальной БД. Все 30 запросов репозиториев
+и 8 запросов тестовых данных собраны с пояснениями в
+[docs/SQL_QUERIES.md](docs/SQL_QUERIES.md).
 
-Go-часть T08 подключена: multipart upload, owner-scoped delete, содержимое
-JPEG/PNG/WebP до 10 MiB, позиции 1–5, компенсация и фото в ответе анкеты.
-SQL и проверка с реальными PostgreSQL/MinIO остаются отдельным этапом;
-инструкции — [docs/T08_PHOTOS.md](docs/T08_PHOTOS.md).
-Go-часть T09 подключена: eligibility пользователя, cursor/limit, карточки со
-свежими URL, read-only snapshot и пакетная загрузка фото. SQL отбора с взаимными
-фильтрами/исключениями и подтверждение на PostgreSQL ожидаются;
-инструкции — [docs/T09_DISCOVERY.md](docs/T09_DISCOVERY.md).
-Go-часть T10–T11 подключена: транзакционный алгоритм свайпа, список своих пар
-с данными партнёра, фото и пагинацией. 10 новых repository SQL-запросов оставлены
-пустыми; атомарность и гонки ещё не подтверждены с PostgreSQL.
-T12 подключена: request ID, JSON-ошибки 404/405, CORS и лимиты auth;
-JSON-операции требуют `Content-Type: application/json`.
-Инструкция по интеграции и оставшимся плейсхолдерам:
-[docs/T10_T12_INTEGRATION.md](docs/T10_T12_INTEGRATION.md).
-Только поздние операции (чат, закрытие мэтча, модерация) остаются `501`.
-OpenAPI задаёт контракт, а `x-release` и `x-implementation-status` уточняют
-этап и готовность. Подробности — [AI/STATUS.md](AI/STATUS.md).
+На изолированных PostgreSQL 18 и MinIO прошёл полный прогон
+`go test -count=1 -race -tags=integration ./...`. Проверены взаимные фильтры,
+исключения, keyset pagination, конкурентные refresh/загрузки/встречные лайки,
+ownership и HTTP-сценарий регистрация → анкета/preferences → фото → лента →
+взаимный мэтч → refresh/logout. Фото из ленты и списка пар доступны по
+подписанным URL реального S3-адаптера.
+
+Для обычных PostgreSQL-тестов задайте `PULSE_TEST_DATABASE_URL` отдельного
+тестового сервера с правом CREATE DATABASE. Для tagged S3-тестов нужны
+`S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`
+изолированного MinIO с созданным bucket. Без этих настроек соответствующие
+интеграционные тесты пропускаются. Команды и ограничения — в справочнике SQL.
+
+Все операции MVP в OpenAPI помечены `implemented`. Чат, закрытие мэтча и
+модерация остаются отложенными `501`-операциями. Полная приёмка MVP ещё требует
+frontend QA, измерений скорости и оставшихся сценариев отказов/перезапуска;
+подробности — [AI/STATUS.md](AI/STATUS.md).
 
 ## Структура
 
 ```text
 cmd/api/                       сборка зависимостей и graceful shutdown
 internal/app/                  сценарии приложения и интерфейсы сервисов
-  auth/                        регистрация, вход и будущий lifecycle сессий
+  auth/                        регистрация, вход и lifecycle сессий
   adminauth/                   заготовка авторизации администратора после MVP
   profile/                     анкета и предпочтения
   media/                       фотографии
@@ -60,7 +59,7 @@ internal/app/                  сценарии приложения и инте
   chat/                        будущие отдельные диалоги
   moderation/                  будущие жалобы и действия администратора
 internal/domain/               сущности, ограничения и порты хранения
-internal/repository/postgres/  место будущих реализаций репозиториев
+internal/repository/postgres/  PostgreSQL-запросы и транзакции
 internal/storage/s3/           S3-адаптер фотографий и интеграционный тест
 internal/platform/database/    создание пула подключений PostgreSQL
 internal/security/             bcrypt и JWT

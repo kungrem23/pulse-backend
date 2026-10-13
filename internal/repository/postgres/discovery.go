@@ -9,7 +9,7 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/domain"
 )
 
-// TODO(db): fill these parameterized queries; no schema changes are required.
+// Parameter and result column order follow the repository contract.
 const (
 	// Params: $1 caller UUID, $2 after-created_at (nullable), $3 after-user UUID
 	// (nullable), $4 requested limit + 1 for lookahead. Never LIMIT joined photos.
@@ -23,13 +23,39 @@ const (
 	// preferences/photos, any outgoing swipe (like or pass), and ANY existing
 	// match with this caller in either pair position, including closed matches.
 	// Incoming swipes alone do not exclude a candidate. Do not reset history.
-	discoveryCandidatesQuery = ""
+	discoveryCandidatesQuery = `
+SELECT u.id::text, p.name, p.bio, u.age, p.sex, p.city, u.created_at
+FROM users me
+JOIN profiles mp ON mp.user_id = me.id
+JOIN preferences mine ON mine.user_id = me.id
+JOIN users u ON u.id <> me.id
+JOIN profiles p ON p.user_id = u.id
+JOIN preferences theirs ON theirs.user_id = u.id
+WHERE me.id = $1::uuid
+  AND NOT me.is_blocked AND NOT mp.is_sleeping
+  AND NOT u.is_blocked AND NOT p.is_sleeping
+  AND u.age BETWEEN mine.min_age AND mine.max_age
+  AND (mine.sex = 'any' OR mine.sex = p.sex)
+  AND me.age BETWEEN theirs.min_age AND theirs.max_age
+  AND (theirs.sex = 'any' OR theirs.sex = mp.sex)
+  AND EXISTS (SELECT 1 FROM photos ph WHERE ph.user_id = u.id)
+  AND NOT EXISTS (SELECT 1 FROM swipes s WHERE s.from_user_id = me.id AND s.to_user_id = u.id)
+  AND NOT EXISTS (SELECT 1 FROM matches m
+      WHERE m.person1_id = LEAST(me.id, u.id) AND m.person2_id = GREATEST(me.id, u.id))
+  AND ($2::timestamptz IS NULL OR (u.created_at, u.id) < ($2::timestamptz, $3::uuid))
+ORDER BY u.created_at DESC, u.id DESC
+LIMIT $4
+`
 
 	// Params: $1 array of the returned candidate user UUIDs, NOT caller UUID.
 	// Return their photos in one query, ordered user_id, position ASC.
 	// Columns: id::text, user_id::text, object_key, position. No URL in the DB.
 	// Restrict rows to that UUID array; do not load photos of unrelated users.
-	discoveryPhotosQuery = ""
+	discoveryPhotosQuery = `
+SELECT id::text, user_id::text, object_key, position
+FROM photos WHERE user_id = ANY($1::uuid[])
+ORDER BY user_id, position ASC
+`
 )
 
 type DiscoveryRepository struct {
@@ -45,9 +71,6 @@ func NewDiscoveryRepository(pool *pgxpool.Pool) *DiscoveryRepository {
 func (r *DiscoveryRepository) Feed(ctx context.Context, userID string, page domain.PageQuery) (domain.PageResult[domain.DiscoveryCandidate], error) {
 	if page.Limit < 1 || page.Limit > 100 {
 		return domain.PageResult[domain.DiscoveryCandidate]{}, domain.ErrInvalidLimit
-	}
-	if searchStateByUserIDQuery == "" || discoveryCandidatesQuery == "" || discoveryPhotosQuery == "" {
-		return domain.PageResult[domain.DiscoveryCandidate]{}, fmt.Errorf("get feed: %w", errQueryNotWritten)
 	}
 	// Recheck the caller and load candidates/photos on one snapshot, so a
 	// concurrent last-photo deletion cannot produce a half-populated card.

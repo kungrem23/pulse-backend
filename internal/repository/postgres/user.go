@@ -18,24 +18,32 @@ const (
 	invalidTextRepresentation = "22P02"
 )
 
-// TODO(db): SQL is written by the database developer. Keep the parameter order
-// and the returned column order: the Go code scans results positionally.
+// Parameter and result column order follow the repository contract.
+// The Go code scans results positionally.
 const (
 	// Params: $1 email (normalized), $2 password_hash, $3 age.
 	// Returns one row: id (UUID as text), is_blocked, created_at.
 	// A duplicate email must fail with unique_violation (23505).
-	createUserQuery = ""
+	createUserQuery = `
+INSERT INTO users (email, password_hash, age)
+VALUES ($1, $2, $3)
+RETURNING id::text, is_blocked, created_at
+`
 
 	// Params: $1 email (normalized).
 	// Returns zero or one row: id (UUID as text), email, password_hash, age, is_blocked, created_at.
-	userByEmailQuery = ""
+	userByEmailQuery = `
+SELECT id::text, email, password_hash, age, is_blocked, created_at
+FROM users WHERE email = $1
+`
 
 	// Params: $1 user id (UUID as text).
 	// Returns the same columns as userByEmailQuery.
-	userByIDQuery = ""
+	userByIDQuery = `
+SELECT id::text, email, password_hash, age, is_blocked, created_at
+FROM users WHERE id = $1::uuid
+`
 )
-
-var errQueryNotWritten = errors.New("SQL query is not written yet")
 
 type UserRepository struct {
 	pool *pgxpool.Pool
@@ -46,9 +54,6 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 }
 
 func (r *UserRepository) Create(ctx context.Context, user domain.User) (domain.User, error) {
-	if createUserQuery == "" {
-		return domain.User{}, fmt.Errorf("create user: %w", errQueryNotWritten)
-	}
 	err := r.pool.QueryRow(ctx, createUserQuery, user.Email, user.PasswordHash, user.Age).
 		Scan(&user.ID, &user.IsBlocked, &user.CreatedAt)
 	if err != nil {
@@ -69,9 +74,6 @@ func (r *UserRepository) ByID(ctx context.Context, id string) (domain.User, erro
 }
 
 func (r *UserRepository) one(ctx context.Context, operation, query string, argument string) (domain.User, error) {
-	if query == "" {
-		return domain.User{}, fmt.Errorf("%s: %w", operation, errQueryNotWritten)
-	}
 	var user domain.User
 	err := r.pool.QueryRow(ctx, query, argument).Scan(
 		&user.ID, &user.Email, &user.PasswordHash, &user.Age, &user.IsBlocked, &user.CreatedAt,

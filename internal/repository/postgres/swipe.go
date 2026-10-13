@@ -12,35 +12,75 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/domain"
 )
 
-// TODO(db): only query placeholders are intentionally unfinished. All locks are
-// held until commit. Lock users (including absent-profile users), then profiles,
+// All row locks are held until commit. Lock users (including absent-profile
+// users), then profiles,
 // preferences and existing photos in canonical user order. These resource locks
 // serialize overlapping pairs and protect block/age/sleep/preferences/photo state.
 // Use row locks that conflict with UPDATE/DELETE; do not use just a match UNIQUE.
 const (
 	// $1 ordered array of two user UUIDs. Lock users ORDER BY id FOR UPDATE.
-	lockSwipeUsersQuery = ""
+	lockSwipeUsersQuery = `
+SELECT id FROM users WHERE id = ANY($1::uuid[])
+ORDER BY id FOR UPDATE
+`
 	// $1 same UUID array. Lock profiles ORDER BY user_id FOR UPDATE.
-	lockSwipeProfilesQuery = ""
+	lockSwipeProfilesQuery = `
+SELECT user_id FROM profiles WHERE user_id = ANY($1::uuid[])
+ORDER BY user_id FOR UPDATE
+`
 	// $1 same UUID array. Lock preferences ORDER BY user_id FOR UPDATE.
-	lockSwipePreferencesQuery = ""
+	lockSwipePreferencesQuery = `
+SELECT user_id FROM preferences WHERE user_id = ANY($1::uuid[])
+ORDER BY user_id FOR UPDATE
+`
 	// $1 same UUID array. Lock photos ORDER BY user_id, position FOR UPDATE.
 	// This protects deletion of the last photo; do not replace with unlocked count.
-	lockSwipePhotosQuery = ""
+	lockSwipePhotosQuery = `
+SELECT id FROM photos WHERE user_id = ANY($1::uuid[])
+ORDER BY user_id, position FOR UPDATE
+`
 	// $1 from UUID, $2 to UUID. Return one bool: outgoing swipe OR ANY existing
 	// match pair in either ordering/status. No resets; a closed pair still conflicts.
-	swipeHistoryConflictQuery = ""
+	swipeHistoryConflictQuery = `
+SELECT EXISTS (SELECT 1 FROM swipes WHERE from_user_id = $1::uuid AND to_user_id = $2::uuid)
+    OR EXISTS (SELECT 1 FROM matches
+        WHERE person1_id = LEAST($1::uuid, $2::uuid) AND person2_id = GREATEST($1::uuid, $2::uuid))
+`
 	// $1 from UUID, $2 to UUID. Return one bool: all four mutual age/sex checks,
 	// including any in either preference. No city filter. Missing data -> false.
-	swipeMutualPreferencesQuery = ""
+	swipeMutualPreferencesQuery = `
+SELECT EXISTS (
+    SELECT 1 FROM users a
+    JOIN profiles ap ON ap.user_id = a.id
+    JOIN preferences ar ON ar.user_id = a.id
+    JOIN users b ON b.id = $2::uuid
+    JOIN profiles bp ON bp.user_id = b.id
+    JOIN preferences br ON br.user_id = b.id
+    WHERE a.id = $1::uuid
+      AND b.age BETWEEN ar.min_age AND ar.max_age
+      AND (ar.sex = 'any' OR ar.sex = bp.sex)
+      AND a.age BETWEEN br.min_age AND br.max_age
+      AND (br.sex = 'any' OR br.sex = ap.sex)
+)
+`
 	// $1 from UUID, $2 to UUID, $3 is_like. INSERT exactly once, no upsert.
-	insertSwipeQuery = ""
+	insertSwipeQuery = `
+INSERT INTO swipes (from_user_id, to_user_id, is_like)
+VALUES ($1::uuid, $2::uuid, $3)
+`
 	// $1 from UUID, $2 to UUID. Return one bool: to -> from has is_like=true.
-	reciprocalLikeQuery = ""
+	reciprocalLikeQuery = `
+SELECT EXISTS (SELECT 1 FROM swipes
+    WHERE from_user_id = $2::uuid AND to_user_id = $1::uuid AND is_like)
+`
 	// $1 canonical person1 UUID, $2 person2 UUID. INSERT active match once.
 	// Return id::text, person1_id::text, person2_id::text, status, created_at.
 	// No conversation, deletion, reopening or overwriting of any existing pair.
-	insertSwipeMatchQuery = ""
+	insertSwipeMatchQuery = `
+INSERT INTO matches (person1_id, person2_id)
+VALUES ($1::uuid, $2::uuid)
+RETURNING id::text, person1_id::text, person2_id::text, status, created_at
+`
 )
 
 type SwipeRepository struct{ pool *pgxpool.Pool }
@@ -68,12 +108,6 @@ func (r *SwipeRepository) Save(ctx context.Context, fromUserID, toUserID string,
 	}
 	if from == to {
 		return nil, domain.ErrSelfSwipe
-	}
-	for _, query := range []string{searchStateByUserIDQuery, lockSwipeUsersQuery, lockSwipeProfilesQuery, lockSwipePreferencesQuery, lockSwipePhotosQuery,
-		swipeHistoryConflictQuery, swipeMutualPreferencesQuery, insertSwipeQuery, reciprocalLikeQuery, insertSwipeMatchQuery} {
-		if query == "" {
-			return nil, fmt.Errorf("save swipe: %w", errQueryNotWritten)
-		}
 	}
 	// Retry only known rolled-back PostgreSQL transactions, never ambiguous
 	// network/commit errors. No token, partial swipe or match is returned on failure.

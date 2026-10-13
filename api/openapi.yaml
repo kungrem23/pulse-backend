@@ -97,7 +97,7 @@ paths:
       tags: [Auth]
       operationId: registerUser
       x-release: mvp
-      x-implementation-status: partial
+      x-implementation-status: implemented
       summary: Register a user
       security: []
       requestBody:
@@ -129,7 +129,7 @@ paths:
       tags: [Auth]
       operationId: loginUser
       x-release: mvp
-      x-implementation-status: partial
+      x-implementation-status: implemented
       summary: Authenticate a user
       security: []
       requestBody:
@@ -193,7 +193,7 @@ paths:
       tags: [Auth]
       operationId: refreshSession
       x-release: mvp
-      x-implementation-status: partial
+      x-implementation-status: implemented
       summary: Rotate a refresh token and issue a new session
       description: |
         The supplied refresh token becomes invalid after a successful rotation.
@@ -227,7 +227,7 @@ paths:
       tags: [Auth]
       operationId: logout
       x-release: mvp
-      x-implementation-status: partial
+      x-implementation-status: implemented
       summary: Revoke a refresh session
       description: |
         Revokes the caller's refresh session. The refresh token must belong to the
@@ -258,7 +258,7 @@ paths:
       tags: [Profile]
       operationId: getOwnProfile
       x-release: mvp
-      x-implementation-status: partial
+      x-implementation-status: implemented
       summary: Get the current user's profile
       description: Photos are ordered by position and receive fresh URLs on each read.
       x-required-principal: user
@@ -287,7 +287,7 @@ paths:
       tags: [Profile]
       operationId: putOwnProfile
       x-release: mvp
-      x-implementation-status: partial
+      x-implementation-status: implemented
       summary: Create or replace the current user's profile
       description: |
         Sets users.age and the profile in one transaction. Text fields are trimmed;
@@ -325,7 +325,7 @@ paths:
       tags: [Profile]
       operationId: putOwnPreferences
       x-release: mvp
-      x-implementation-status: partial
+      x-implementation-status: implemented
       summary: Create or replace discovery preferences
       x-required-principal: user
       security:
@@ -365,7 +365,7 @@ paths:
       tags: [Profile]
       operationId: setProfileSleepMode
       x-release: mvp
-      x-implementation-status: partial
+      x-implementation-status: implemented
       summary: Enable or disable sleep mode
       description: |
         A sleeping profile is not shown to others and cannot use the feed or swipe.
@@ -406,11 +406,10 @@ paths:
       tags: [Photos]
       operationId: uploadPhoto
       x-release: mvp
-      x-implementation-status: partial
+      x-implementation-status: implemented
       summary: Upload a profile photo
       description: |
-        HTTP/application and PostgreSQL adapter wiring are implemented; the four
-        photo SQL queries are placeholders pending the database implementation.
+        Implemented with PostgreSQL metadata and S3 object storage.
         Requires an existing profile. Accepts exactly one file and one position;
         unknown/duplicate multipart fields are rejected. Ownership comes from JWT.
         The complete image is decoded, independently of filename or declared MIME.
@@ -462,10 +461,10 @@ paths:
       tags: [Photos]
       operationId: deletePhoto
       x-release: mvp
-      x-implementation-status: partial
+      x-implementation-status: implemented
       summary: Delete one of the current user's photos
       description: |
-        HTTP/application and PostgreSQL adapter wiring are implemented; SQL is pending.
+        Implemented with owner-scoped PostgreSQL queries and S3 object deletion.
         A missing or foreign photo returns the same 404. Deletes the object before
         metadata; a failed object deletion retains metadata. If metadata deletion
         fails after object deletion, retrying safely finishes cleanup.
@@ -493,7 +492,7 @@ paths:
       tags: [Discovery]
       operationId: getDiscoveryFeed
       x-release: mvp
-      x-implementation-status: partial
+      x-implementation-status: implemented
       summary: Get profile recommendations
       description: |
         Requires a completed profile, preferences, at least one photo, and sleep
@@ -503,11 +502,10 @@ paths:
         array when exhausted; MVP does not reset swipe history.
         Pagination order is users.created_at descending, then users.id descending.
         Cursors belong to this list and the authenticated user.
-        HTTP/application, snapshot reads and bulk photo adapter wiring are implemented;
-        search-state, candidate and bulk-photo SQL queries are placeholders.
+        State, candidate selection and bulk photos are read on one PostgreSQL snapshot.
         Only cursor and limit query parameters are accepted; empty, duplicate or
         malformed parameters return 400. Unfinished onboarding, no photos or sleep
-        return 403. Candidate filtering and SQL performance await database verification.
+        return 403. Mutual filters, exclusions and pagination are verified on PostgreSQL.
       x-required-principal: user
       security:
         - bearerAuth: []
@@ -535,7 +533,7 @@ paths:
       tags: [Matching]
       operationId: createSwipe
       x-release: mvp
-      x-implementation-status: partial
+      x-implementation-status: implemented
       summary: Like or dislike a user
       description: |
         Saving the swipe and creating a mutual match are atomic, including checks
@@ -545,8 +543,8 @@ paths:
         is not a UUID returns 422. A missing or non-boolean is_like returns 400.
         403 means the caller cannot take part in discovery: blocked, incomplete
         profile or preferences, no photos, or sleep mode.
-        HTTP/application and PostgreSQL adapter are wired. SQL remains placeholders;
-        database atomicity and concurrency await verification with filled queries.
+        PostgreSQL row locks serialize both users in canonical UUID order.
+        Concurrent mutual likes create exactly one match in the same transaction.
       x-required-principal: user
       security:
         - bearerAuth: []
@@ -583,7 +581,7 @@ paths:
       tags: [Matching]
       operationId: listMatches
       x-release: mvp
-      x-implementation-status: partial
+      x-implementation-status: implemented
       summary: List the current user's matches
       description: |
         Returns only the caller's matches, including closed pairs. Sleeping or
@@ -595,7 +593,7 @@ paths:
         An empty, repeated or foreign cursor and an explicit limit outside
         1-100 (including 0) or not a plain integer return 400. 403 is returned
         only for a blocked caller.
-        HTTP/application and PostgreSQL adapter are wired; list SQL is a placeholder.
+        PostgreSQL loads the partner and first photo in one paginated query.
       x-required-principal: user
       security:
         - bearerAuth: []

@@ -16,29 +16,33 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/testsupport/pgtest"
 )
 
-// TODO(db): fixture queries remain empty too. Only pgtest's throwaway DB may
-// run these queries; never point the harness at the application database.
+// Only pgtest's throwaway database may run these fixture queries; never point the harness at the application database.
 const (
 	// $1 user UUID. Set this user's is_blocked to true.
-	matchingTestBlockUserQuery = ""
+	matchingTestBlockUserQuery = `
+UPDATE users SET is_blocked = true, updated_at = now() WHERE id = $1::uuid
+`
 	// $1 from UUID, $2 to UUID. Return is_like, or no rows if absent.
-	matchingTestSwipeQuery = ""
+	matchingTestSwipeQuery = `
+SELECT is_like FROM swipes WHERE from_user_id = $1::uuid AND to_user_id = $2::uuid
+`
 	// $1 canonical person1 UUID, $2 person2 UUID. All pair matches, any status.
 	// Columns: id::text, person1_id::text, person2_id::text, status, created_at.
-	matchingTestPairMatchesQuery = ""
+	matchingTestPairMatchesQuery = `
+SELECT id::text, person1_id::text, person2_id::text, status, created_at
+FROM matches WHERE person1_id = $1::uuid AND person2_id = $2::uuid
+`
 	// $1 canonical person1 UUID, $2 person2 UUID, $3 created_at, $4 status.
 	// Insert pair, set closed_at coherently (closed vs active), return id::text.
-	matchingTestCreateMatchQuery = ""
+	matchingTestCreateMatchQuery = `
+INSERT INTO matches (person1_id, person2_id, created_at, status, closed_at)
+VALUES ($1::uuid, $2::uuid, $3::timestamptz, $4,
+    CASE WHEN $4 = 'closed' THEN $3::timestamptz ELSE NULL END)
+RETURNING id::text
+`
 )
 
 type matchingFixture struct{ pool *pgxpool.Pool }
-
-func requireMatchingFixtureQuery(t *testing.T, query string) {
-	t.Helper()
-	if query == "" {
-		t.Fatal("T10/T11 test fixture SQL is not written yet; fill the documented placeholder")
-	}
-}
 
 func (f matchingFixture) createUser(t *testing.T, spec matchtest.UserSpec, noProfile bool, min, max int16, searchSex domain.SearchSex) string {
 	t.Helper()
@@ -71,7 +75,6 @@ func (f matchingFixture) createUser(t *testing.T, spec matchtest.UserSpec, noPro
 		}
 	}
 	if spec.Blocked {
-		requireMatchingFixtureQuery(t, matchingTestBlockUserQuery)
 		if _, err := f.pool.Exec(ctx, matchingTestBlockUserQuery, user.ID); err != nil {
 			t.Fatal(err)
 		}
@@ -109,7 +112,6 @@ func TestSwipeRepositoryContractWithPostgres(t *testing.T) {
 			},
 			Swipe: func(t *testing.T, from, to string) (bool, bool) {
 				t.Helper()
-				requireMatchingFixtureQuery(t, matchingTestSwipeQuery)
 				var like bool
 				err := f.pool.QueryRow(context.Background(), matchingTestSwipeQuery, from, to).Scan(&like)
 				if errors.Is(err, pgx.ErrNoRows) {
@@ -122,7 +124,6 @@ func TestSwipeRepositoryContractWithPostgres(t *testing.T) {
 			},
 			Matches: func(t *testing.T, a, b string) []domain.Match {
 				t.Helper()
-				requireMatchingFixtureQuery(t, matchingTestPairMatchesQuery)
 				if a > b {
 					a, b = b, a
 				}
@@ -158,7 +159,6 @@ func TestMatchRepositoryContractWithPostgres(t *testing.T) {
 			},
 			CreateMatch: func(t *testing.T, a, b string, createdAt time.Time, status string) string {
 				t.Helper()
-				requireMatchingFixtureQuery(t, matchingTestCreateMatchQuery)
 				if a > b {
 					a, b = b, a
 				}

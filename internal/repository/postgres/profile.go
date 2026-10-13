@@ -11,38 +11,65 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/domain"
 )
 
-// TODO(db): SQL is written by the database developer. Keep the parameter order
-// and the returned column order: the Go code scans results positionally.
+// Parameter and result column order follow the repository contract.
+// The Go code scans results positionally.
 const (
 	// Params: $1 user_id, $2 age.
 	// Sets users.age and users.updated_at. Zero affected rows means no such user.
-	updateUserAgeQuery = ""
+	updateUserAgeQuery = `
+UPDATE users SET age = $2, updated_at = now()
+WHERE id = $1::uuid
+`
 
 	// Params: $1 user_id, $2 name, $3 bio, $4 sex, $5 city.
 	// Creates the profile or replaces these fields of an existing one in a single
 	// statement (concurrent first saves must not fail with unique_violation).
 	// Must not change is_sleeping of an existing profile; sets updated_at.
 	// Returns one row: is_sleeping.
-	upsertProfileQuery = ""
+	upsertProfileQuery = `
+INSERT INTO profiles (user_id, name, bio, sex, city)
+VALUES ($1::uuid, $2, $3, $4, $5)
+ON CONFLICT (user_id) DO UPDATE
+SET name = EXCLUDED.name, bio = EXCLUDED.bio, sex = EXCLUDED.sex,
+    city = EXCLUDED.city, updated_at = now()
+RETURNING is_sleeping
+`
 
 	// Params: $1 user_id.
 	// Returns zero or one row: user_id (UUID as text), name, bio, age (from users), sex, city, is_sleeping.
-	profileByUserIDQuery = ""
+	profileByUserIDQuery = `
+SELECT p.user_id::text, p.name, p.bio, u.age, p.sex, p.city, p.is_sleeping
+FROM profiles p JOIN users u ON u.id = p.user_id
+WHERE p.user_id = $1::uuid
+`
 
 	// Params: $1 user_id.
 	// Returns zero or one row: user_id (UUID as text), min_age, max_age, sex.
-	preferencesByUserIDQuery = ""
+	preferencesByUserIDQuery = `
+SELECT user_id::text, min_age, max_age, sex
+FROM preferences WHERE user_id = $1::uuid
+`
 
 	// Params: $1 user_id, $2 min_age, $3 max_age, $4 sex.
 	// Creates or replaces the user's preferences in a single statement.
 	// Without a profile it must fail with foreign_key_violation (23503).
 	// Returns one row: user_id (UUID as text), min_age, max_age, sex.
-	upsertPreferencesQuery = ""
+	upsertPreferencesQuery = `
+INSERT INTO preferences (user_id, min_age, max_age, sex)
+VALUES ($1::uuid, $2, $3, $4)
+ON CONFLICT (user_id) DO UPDATE
+SET min_age = EXCLUDED.min_age, max_age = EXCLUDED.max_age, sex = EXCLUDED.sex
+RETURNING user_id::text, min_age, max_age, sex
+`
 
 	// Params: $1 user_id, $2 is_sleeping.
 	// Sets profiles.is_sleeping and updated_at. Returns zero rows if there is
 	// no profile, otherwise one row: is_sleeping.
-	setSleepQuery = ""
+	setSleepQuery = `
+UPDATE profiles SET is_sleeping = $2, updated_at = now()
+WHERE user_id = $1::uuid
+RETURNING is_sleeping
+`
 )
 
 type ProfileRepository struct {
@@ -54,9 +81,6 @@ func NewProfileRepository(pool *pgxpool.Pool) *ProfileRepository {
 }
 
 func (r *ProfileRepository) Save(ctx context.Context, profile domain.Profile) (domain.Profile, error) {
-	if updateUserAgeQuery == "" || upsertProfileQuery == "" {
-		return domain.Profile{}, fmt.Errorf("save profile: %w", errQueryNotWritten)
-	}
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return domain.Profile{}, fmt.Errorf("save profile: begin: %w", err)
@@ -86,9 +110,6 @@ func (r *ProfileRepository) Save(ctx context.Context, profile domain.Profile) (d
 }
 
 func (r *ProfileRepository) ByUserID(ctx context.Context, userID string) (domain.Profile, error) {
-	if profileByUserIDQuery == "" {
-		return domain.Profile{}, fmt.Errorf("find profile: %w", errQueryNotWritten)
-	}
 	var profile domain.Profile
 	var sex string
 	err := r.pool.QueryRow(ctx, profileByUserIDQuery, userID).Scan(
@@ -102,9 +123,6 @@ func (r *ProfileRepository) ByUserID(ctx context.Context, userID string) (domain
 }
 
 func (r *ProfileRepository) Preferences(ctx context.Context, userID string) (domain.Preferences, error) {
-	if preferencesByUserIDQuery == "" {
-		return domain.Preferences{}, fmt.Errorf("find preferences: %w", errQueryNotWritten)
-	}
 	var preferences domain.Preferences
 	var sex string
 	err := r.pool.QueryRow(ctx, preferencesByUserIDQuery, userID).Scan(
@@ -118,9 +136,6 @@ func (r *ProfileRepository) Preferences(ctx context.Context, userID string) (dom
 }
 
 func (r *ProfileRepository) SavePreferences(ctx context.Context, preferences domain.Preferences) (domain.Preferences, error) {
-	if upsertPreferencesQuery == "" {
-		return domain.Preferences{}, fmt.Errorf("save preferences: %w", errQueryNotWritten)
-	}
 	var saved domain.Preferences
 	var sex string
 	err := r.pool.QueryRow(ctx, upsertPreferencesQuery,
@@ -137,9 +152,6 @@ func (r *ProfileRepository) SavePreferences(ctx context.Context, preferences dom
 }
 
 func (r *ProfileRepository) SetSleep(ctx context.Context, userID string, isSleeping bool) (bool, error) {
-	if setSleepQuery == "" {
-		return false, fmt.Errorf("set sleep mode: %w", errQueryNotWritten)
-	}
 	var stored bool
 	if err := r.pool.QueryRow(ctx, setSleepQuery, userID, isSleeping).Scan(&stored); err != nil {
 		return false, notFoundOr("set sleep mode", err)

@@ -203,7 +203,17 @@ func TestAuthHTTPWithPostgres(t *testing.T) {
 			t.Fatalf("expected 401 invalid_credentials, got %d: %s", response.Code, response.Body)
 		}
 	}
-	if wrongPassword.Body.String() != unknownEmail.Body.String() {
+	var wrongBody, unknownBody struct {
+		Error json.RawMessage `json:"error"`
+	}
+	if err := json.Unmarshal(wrongPassword.Body.Bytes(), &wrongBody); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(unknownEmail.Body.Bytes(), &unknownBody); err != nil {
+		t.Fatal(err)
+	}
+	// Request IDs identify different requests; the public error must be identical.
+	if string(wrongBody.Error) != string(unknownBody.Error) {
 		t.Fatalf("login errors must not reveal whether an email exists: %s vs %s", wrongPassword.Body, unknownEmail.Body)
 	}
 

@@ -16,7 +16,7 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/transport/http/httpx/contracttest"
 )
 
-// Prepared for the SQL stage. Real JWT/auth/profile/swipe/match repositories
+// Real JWT/auth/profile/swipe/match repositories
 // and the full router are used. URL signing alone is a test adapter; real S3
 // is covered separately by the T08 PostgreSQL/MinIO HTTP test.
 func TestMatchingHTTPWithPostgres(t *testing.T) {
@@ -160,5 +160,5 @@ func TestMatchingHTTPWithPostgres(t *testing.T) {
 	}
 	expect("GET", "/api/v1/matches", server.get(t, "/api/v1/matches", ""), 401)
 	closePath := "/api/v1/matches/" + firstMatch
-	expect("DELETE", "/api/v1/matches/{id}", server.request(t, "DELETE", closePath, "", tokenA), 501)
+	expect("DELETE", "/api/v1/matches/{match_id}", server.request(t, "DELETE", closePath, "", tokenA), 501)
 }
