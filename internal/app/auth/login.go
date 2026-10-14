@@ -9,8 +9,6 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/security"
 )
 
-// dummyUserPasswordHash is checked for unknown emails so that a failed login
-// performs approximately the same bcrypt work whether or not the user exists.
 const dummyUserPasswordHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
 
 func (s *service) Login(ctx context.Context, command LoginCommand) (Session, error) {

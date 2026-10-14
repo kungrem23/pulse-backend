@@ -10,9 +10,6 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/security"
 )
 
-// dummyAdminPasswordHash has the same bcrypt work factor as production hashes.
-// It is checked when a username is unknown to reduce username-enumeration timing
-// differences. Its plaintext value is irrelevant and it grants no access.
 const dummyAdminPasswordHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
 
 func (s *service) Login(ctx context.Context, command LoginCommand) (Session, error) {
@@ -24,8 +21,6 @@ func (s *service) Login(ctx context.Context, command LoginCommand) (Session, err
 	admin, err := s.admins.ByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
-			// Ignore the result: this comparison only makes the not-found path do
-			// approximately the same amount of work as a regular failed login.
 			_ = s.passwords.Verify(command.Password, dummyAdminPasswordHash)
 			return Session{}, ErrInvalidCredentials
 		}

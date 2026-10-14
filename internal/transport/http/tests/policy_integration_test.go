@@ -1,8 +1,9 @@
-package httpapi
+package httpapi_test
 
 import (
 	"context"
 	"encoding/json"
+	httpapi "github.com/kungrem23/pulse-backend/internal/transport/http"
 	"io"
 	"log/slog"
 	"net/http/httptest"
@@ -32,7 +33,7 @@ func TestRouterHTTPPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	const origin = "https://frontend.example"
-	router := NewRouter(Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Auth: policyAuth{}, AuthRateLimiter: limiter, CORSOrigins: []string{origin}})
+	router := httpapi.NewRouter(httpapi.Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Auth: policyAuth{}, AuthRateLimiter: limiter, CORSOrigins: []string{origin}})
 	spec := contracttest.Load(t)
 	send := func(method, path string, headers map[string]string) *httptest.ResponseRecorder {
 		t.Helper()

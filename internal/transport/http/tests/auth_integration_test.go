@@ -1,8 +1,9 @@
-package httpapi
+package httpapi_test
 
 import (
 	"context"
 	"encoding/json"
+	httpapi "github.com/kungrem23/pulse-backend/internal/transport/http"
 	"io"
 	"log/slog"
 	"net/http"
@@ -86,7 +87,7 @@ func (s *integrationServer) router(t *testing.T) http.Handler {
 		t.Fatal(err)
 	}
 	photos := postgres.NewPhotoRepository(s.pool)
-	return NewRouter(Dependencies{
+	return httpapi.NewRouter(httpapi.Dependencies{
 		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Database: s.pool,
 		Auth: appauth.NewService(

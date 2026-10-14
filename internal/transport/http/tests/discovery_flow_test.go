@@ -1,8 +1,9 @@
-package httpapi
+package httpapi_test
 
 import (
 	"context"
 	"encoding/json"
+	httpapi "github.com/kungrem23/pulse-backend/internal/transport/http"
 	"io"
 	"log/slog"
 	"net/http"
@@ -56,7 +57,7 @@ func TestDiscoveryHTTPFlowAndLastPhotoGate(t *testing.T) {
 	}
 	repository := &feedFlowRepository{first: makeCandidate("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"), second: makeCandidate("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")}
 	states := &feedFlowStates{photos: photos}
-	router := NewRouter(Dependencies{
+	router := httpapi.NewRouter(httpapi.Dependencies{
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Auth: photoFlowAuth{},
 		Media: appmedia.NewService(photos, storage), Discovery: appdiscovery.NewService(repository, states, storage),
 	})

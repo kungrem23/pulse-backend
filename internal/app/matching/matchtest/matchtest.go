@@ -12,15 +12,12 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/domain"
 )
 
-// UserSpec describes a user with a profile. The repository must return such a
-// partner whatever its discovery state is.
 type UserSpec struct {
-	Name string
-	Age  int
-	Sex  domain.Sex
-	City string
-	Bio  string
-	// PhotoPositions lists the user's photo positions; empty means no photos.
+	Name           string
+	Age            int
+	Sex            domain.Sex
+	City           string
+	Bio            string
 	PhotoPositions []int16
 
 	NoPreferences bool
@@ -28,21 +25,14 @@ type UserSpec struct {
 	Blocked       bool
 }
 
-// Harness connects the contract to a storage implementation.
 type Harness struct {
-	Repository domain.MatchRepository
-	// CreateUser stores the user with a profile and returns its UUID.
-	CreateUser func(t *testing.T, spec UserSpec) string
-	// CreateMatch stores a match of a and b in canonical order with the given
-	// creation time and status (active or closed) and returns its UUID.
+	Repository  domain.MatchRepository
+	CreateUser  func(t *testing.T, spec UserSpec) string
 	CreateMatch func(t *testing.T, a, b string, createdAt time.Time, status string) string
 }
 
-// base is a fixed time with microsecond precision, the PostgreSQL resolution.
 var base = time.Date(2026, 10, 13, 12, 0, 0, 123456000, time.UTC)
 
-// Run checks the contract. newHarness is called once; every case creates its
-// own users.
 func Run(t *testing.T, newHarness func(t *testing.T) Harness) {
 	t.Helper()
 	h := newHarness(t)
@@ -158,13 +148,11 @@ func Run(t *testing.T, newHarness func(t *testing.T) Harness) {
 			createdAt time.Time
 		}
 		var all []expected
-		// Distinct times plus a tie at base+2s that is broken by match ID.
 		for i, offset := range []int{0, 1, 2, 2, 2, 3, 4} {
 			partner, _ := person(t, "Партнёр")
 			createdAt := base.Add(time.Duration(offset) * time.Second)
 			all = append(all, expected{h.CreateMatch(t, owner, partner, createdAt, "active"), createdAt})
 			if i%2 == 0 {
-				// Someone else's match at the same time must never appear.
 				h.CreateMatch(t, other1, other2, createdAt.Add(time.Duration(i)*time.Microsecond), "active")
 				other2, _ = person(t, "Другой")
 			}
@@ -206,7 +194,6 @@ func Run(t *testing.T, newHarness func(t *testing.T) Harness) {
 			}
 		}
 
-		// A cursor past the last item gives an empty last page.
 		oldest := all[len(all)-1]
 		result := list(t, owner, domain.PageQuery{Limit: 10, After: &domain.PagePosition{CreatedAt: oldest.createdAt, ID: oldest.id}})
 		if len(result.Items) != 0 || result.HasMore {

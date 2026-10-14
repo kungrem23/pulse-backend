@@ -1,6 +1,6 @@
 //go:build integration
 
-package httpapi
+package httpapi_test
 
 import (
 	"encoding/json"

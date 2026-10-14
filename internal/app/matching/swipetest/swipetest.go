@@ -15,8 +15,6 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/domain"
 )
 
-// UserSpec describes a user to seed. The zero value of the optional fields
-// gives a complete, awake, unblocked profile with preferences and one photo.
 type UserSpec struct {
 	Age       int
 	Sex       domain.Sex
@@ -31,24 +29,15 @@ type UserSpec struct {
 	Blocked       bool
 }
 
-// Harness connects the contract to a storage implementation.
 type Harness struct {
 	Repository domain.SwipeRepository
-	// CreateUser stores the user (users, profiles, preferences, photos as the
-	// spec says) and returns its UUID.
 	CreateUser func(t *testing.T, spec UserSpec) string
-	// Swipe returns the stored swipe from -> to, if any.
-	Swipe func(t *testing.T, from, to string) (isLike, found bool)
-	// Matches returns every match of any status between the two users.
-	Matches func(t *testing.T, a, b string) []domain.Match
+	Swipe      func(t *testing.T, from, to string) (isLike, found bool)
+	Matches    func(t *testing.T, a, b string) []domain.Match
 }
 
-// ConcurrentRounds is how many pairs like each other simultaneously in the
-// race test. A missing pair lock usually fails within a few rounds.
 const ConcurrentRounds = 25
 
-// Run checks the contract. newHarness is called once; every case creates its
-// own users, so cases do not depend on each other.
 func Run(t *testing.T, newHarness func(t *testing.T) Harness) {
 	t.Helper()
 	h := newHarness(t)
@@ -279,7 +268,6 @@ type saveResult struct {
 	err   error
 }
 
-// saveConcurrently starts all calls at once and waits for them.
 func saveConcurrently(h Harness, calls [][2]string, isLike bool) []saveResult {
 	results := make([]saveResult, len(calls))
 	start := make(chan struct{})

@@ -48,7 +48,6 @@ func (s *service) Register(ctx context.Context, command RegisterCommand) (Regist
 		return Registration{}, err
 	}
 
-	// A password hash is never needed outside authentication internals.
 	user.PasswordHash = ""
 	return Registration{
 		User:    user,

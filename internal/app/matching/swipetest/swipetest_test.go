@@ -11,8 +11,6 @@ import (
 	"github.com/kungrem23/pulse-backend/internal/domain"
 )
 
-// memoryRepository is a reference implementation that shows the contract is
-// satisfiable; one mutex plays the role of the pair lock.
 type memoryRepository struct {
 	mu      sync.Mutex
 	users   map[string]UserSpec

@@ -37,9 +37,6 @@ type wireCursor struct {
 	ID        string    `json:"id"`
 }
 
-// Parse validates app input and decodes a cursor into a repository query.
-// Limit == 0 means omitted; the HTTP adapter must reject an explicit ?limit=0.
-// An empty cursor means omitted; HTTP must reject an explicit ?cursor=.
 func Parse(request domain.PageRequest, scope Scope, userID string) (domain.PageQuery, error) {
 	owner, ok := canonicalUUID(userID)
 	if !ok {

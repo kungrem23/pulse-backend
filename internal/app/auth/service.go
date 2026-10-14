@@ -11,13 +11,11 @@ import (
 )
 
 var (
-	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrInvalidEmail       = errors.New("invalid email")
-	ErrInvalidPassword    = errors.New("invalid password")
-	ErrEmailAlreadyExists = errors.New("email already exists")
-	ErrUserBlocked        = errors.New("user is blocked")
-	// ErrInvalidRefreshToken covers malformed, expired, revoked, reused and
-	// foreign refresh tokens alike, so callers cannot tell them apart.
+	ErrInvalidCredentials  = errors.New("invalid credentials")
+	ErrInvalidEmail        = errors.New("invalid email")
+	ErrInvalidPassword     = errors.New("invalid password")
+	ErrEmailAlreadyExists  = errors.New("email already exists")
+	ErrUserBlocked         = errors.New("user is blocked")
 	ErrInvalidRefreshToken = errors.New("invalid refresh token")
 	ErrInvalidAccessToken  = errors.New("invalid access token")
 )
@@ -36,7 +34,6 @@ type RefreshCommand struct {
 	RefreshToken string
 }
 
-// LogoutCommand.UserID must come from a verified access token.
 type LogoutCommand struct {
 	UserID       string
 	RefreshToken string
@@ -59,8 +56,6 @@ type Service interface {
 	Login(context.Context, LoginCommand) (Session, error)
 	Refresh(context.Context, RefreshCommand) (Session, error)
 	Logout(context.Context, LogoutCommand) error
-	// Authenticate returns the ID of the user owning a valid user access token.
-	// It fails with ErrUserBlocked for blocked accounts even if the JWT is valid.
 	Authenticate(ctx context.Context, accessToken string) (string, error)
 }
 

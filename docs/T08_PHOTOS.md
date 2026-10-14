@@ -104,8 +104,8 @@ multipart body, JWT ownership, компенсацию, удаление с по�
 go test ./...
 go vet ./...
 go test -race ./internal/app/media ./internal/app/profile ./internal/transport/http/...
-go test -count=1 ./internal/repository/postgres ./internal/transport/http
-go test -count=1 -tags=integration ./internal/transport/http -run TestPhotosWithPostgresAndS3 -v
+go test -count=1 ./internal/repository/postgres ./internal/transport/http/tests
+go test -count=1 -tags=integration ./internal/transport/http/tests -run TestPhotosWithPostgresAndS3 -v
 git diff --check
 ```
 

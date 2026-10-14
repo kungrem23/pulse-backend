@@ -1,9 +1,10 @@
-package httpapi
+package httpapi_test
 
 import (
 	"bytes"
 	"context"
 	"errors"
+	httpapi "github.com/kungrem23/pulse-backend/internal/transport/http"
 	"image"
 	"image/png"
 	"io"
@@ -175,7 +176,7 @@ func photoPNG(t *testing.T) []byte {
 func TestPhotoHTTPFlowAndConcurrentPositions(t *testing.T) {
 	photos := &photoFlowRepository{photos: make(map[string]domain.Photo)}
 	storage := &photoFlowStorage{objects: make(map[string][]byte)}
-	router := NewRouter(Dependencies{
+	router := httpapi.NewRouter(httpapi.Dependencies{
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Auth: photoFlowAuth{},
 		Media: appmedia.NewService(photos, storage), Profile: appprofile.NewService(photoFlowProfiles{}, photos, storage),
 	})
@@ -261,7 +262,7 @@ func TestPhotoHTTPFlowAndConcurrentPositions(t *testing.T) {
 func TestPhotoHTTPStorageFailuresAndDeleteRetry(t *testing.T) {
 	photos := &photoFlowRepository{photos: make(map[string]domain.Photo)}
 	storage := &photoFlowStorage{objects: make(map[string][]byte)}
-	router := NewRouter(Dependencies{
+	router := httpapi.NewRouter(httpapi.Dependencies{
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Auth: photoFlowAuth{},
 		Media: appmedia.NewService(photos, storage),
 	})

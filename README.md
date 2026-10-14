@@ -65,6 +65,7 @@ internal/storage/s3/           S3-адаптер фотографий и инт�
 internal/platform/database/    создание пула подключений PostgreSQL
 internal/security/             bcrypt и JWT
 internal/transport/http/       HTTP-адаптеры, DTO, маршруты и middleware
+internal/transport/http/tests/ тесты роутера и сквозных HTTP-сценариев
 api/openapi.yaml               целевой контракт API
 migrations/                    историческая и согласованная MVP-схема
 AI/                            контекст и инструкции для дальнейшей разработки

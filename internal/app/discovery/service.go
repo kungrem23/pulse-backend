@@ -16,9 +16,6 @@ type Candidate struct {
 }
 
 type Service interface {
-	// Feed uses the authenticated user ID and shared pagination validation.
-	// Check eligibility through SearchStateRepository; DiscoveryRepository owns
-	// mutual filters and exclusions. Resolve photo keys to fresh URLs.
 	Feed(context.Context, string, domain.PageRequest) (domain.Page[Candidate], error)
 }
 
@@ -56,7 +53,6 @@ func (s *service) Feed(ctx context.Context, userID string, request domain.PageRe
 		last := result.Items[len(result.Items)-1]
 		page.NextCursor, err = pagination.Encode(domain.PagePosition{CreatedAt: last.CreatedAt, ID: last.Profile.UserID}, pagination.Feed, userID)
 		if err != nil {
-			// A bad repository position is an internal error, not the client's cursor.
 			return domain.Page[Candidate]{}, fmt.Errorf("encode repository feed position: %v", err)
 		}
 	}

@@ -1,8 +1,9 @@
-package httpapi
+package httpapi_test
 
 import (
 	"context"
 	"encoding/json"
+	httpapi "github.com/kungrem23/pulse-backend/internal/transport/http"
 	"io"
 	"log/slog"
 	"net/http"
@@ -15,7 +16,7 @@ import (
 
 func TestLiveness(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	router := NewRouter(Dependencies{Logger: logger})
+	router := httpapi.NewRouter(httpapi.Dependencies{Logger: logger})
 	req := httptest.NewRequest(http.MethodGet, "/health/live", nil)
 	res := httptest.NewRecorder()
 
@@ -60,7 +61,7 @@ var userRoutes = []struct{ method, path string }{
 }
 
 func TestUserRoutesRequireUnblockedUser(t *testing.T) {
-	router := NewRouter(Dependencies{
+	router := httpapi.NewRouter(httpapi.Dependencies{
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Auth:   authStub{},
 	})
@@ -100,7 +101,7 @@ func TestUserRoutesRequireUnblockedUser(t *testing.T) {
 }
 
 func TestUserRoutesFailClosedWithoutAuthService(t *testing.T) {
-	router := NewRouter(Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	router := httpapi.NewRouter(httpapi.Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/profile", nil)
 	request.Header.Set("Authorization", "Bearer valid")
 	res := httptest.NewRecorder()
@@ -111,7 +112,7 @@ func TestUserRoutesFailClosedWithoutAuthService(t *testing.T) {
 }
 
 func TestAdminPlaceholdersStayNotImplemented(t *testing.T) {
-	router := NewRouter(Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	router := httpapi.NewRouter(httpapi.Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	for _, route := range []struct{ method, path string }{
 		{http.MethodGet, "/api/v1/admin/reports"},
 		{http.MethodPatch, "/api/v1/admin/reports/" + sampleID},
